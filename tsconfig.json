@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "outDir": "dist",
+    "allowJs": false,
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": false,
+    "declaration": true,
+    "strictNullChecks": true,
+    "emitDeclarationOnly": false
+  },
+  "include": [
+    "./index.ts",
+    "./src/**/*",
+  ]
+}
