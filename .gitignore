@@ -1,3 +1,4 @@
 dist
 .idea
 proto/generated
+node_modules

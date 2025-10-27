@@ -4,9 +4,9 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc && rollup -c rollup.config.js",
-    "build:grpc": "npm run proto:generate",
+    "build:grpc": "protoc --ts_out proto/generated --ts_opt generate_dependencies --ts_opt client_generic --proto_path proto core.proto",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "proto:generate": "grpc_tools_node_protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=./proto/generated --ts_proto_opt=useAsyncIterable=false --ts_proto_opt=forceLong=string,env=browser,outputServices=grpc-web,outputServices=generic-definitions,outputJsonMethods=false,useExactTypes=false --proto_path=./proto ./proto/core.proto"
+    "gen-proto": "protoc -I=./proto --ts_out=proto/generated ./proto/core.proto"
   },
   "type": "module",
   "author": "",
@@ -14,18 +14,22 @@
   "description": "",
   "devDependencies": {
     "@babel/plugin-transform-modules-systemjs": "^7.27.1",
+    "@protobuf-ts/plugin": "^2.11.1",
     "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-typescript": "^12.1.4",
-    "grpc-tools": "^1.13.0",
-    "grpc_tools_node_protoc_ts": "^5.3.3",
     "rollup": "^4.50.2",
     "rollup-plugin-babel": "^4.4.0",
     "ts-proto": "^2.7.7",
-    "tslib": "^2.8.1"
+    "tslib": "^2.8.1",
+    "tsx": "^4.20.5"
   },
   "dependencies": {
-    "nice-grpc-web": "^3.3.8",
-    "typescript": "^5.9.2"
+    "@protobuf-ts/grpcweb-transport": "^2.11.1",
+    "@scure/base": "^2.0.0",
+    "bloom-filter": "^0.2.0",
+    "protoc": "^32.1.0",
+    "typescript": "^5.9.2",
+    "ws": "^8.18.3"
   }
 }

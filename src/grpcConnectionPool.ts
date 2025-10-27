@@ -1,12 +1,9 @@
-import {Channel, Client, createChannel, createClient} from 'nice-grpc-web'
-import {
-    CoreDefinition,
-    GetBlockchainStatusRequest,
-    GetBlockchainStatusResponse,
-    GetBlockchainStatusResponse_Status
-} from '../proto/generated/core.js'
-import getRandomArrayItem from "./utils.js";
 import getEvonodeList from './getEvonodeList.js';
+import GrpcWebFetchTransport from '@protobuf-ts/grpcweb-transport/build/es2015/grpc-web-transport.js'
+import {getRandomArrayItem} from "./utils.js";
+import {CoreClient} from "../proto/generated/core.client";
+import {GetBlockchainStatusRequest, GetBlockchainStatusResponse_Status} from "../proto/generated/core";
+
 const GRPC_DEFAULT_POOL_LIMIT = 5
 export type MasternodeList = Record<string, MasternodeInfo>
 export interface GRPCOptions {
@@ -49,8 +46,15 @@ const seedNodes = {
     ]
 }
 
+const createClient = (url: string, abortController?: AbortController): CoreClient => {
+    return new CoreClient(new GrpcWebFetchTransport.GrpcWebFetchTransport({
+        baseUrl: url,
+        abort: abortController?.signal
+    }))
+}
+
 export default class GRPCConnectionPool {
-    channels: Channel[]
+    dapiUrls: string[]
     network: string
 
     constructor (network: 'testnet' | 'mainnet', grpcOptions?: GRPCOptions) {
@@ -63,13 +67,13 @@ export default class GRPCConnectionPool {
 
     async _initialize (network: 'testnet' | 'mainnet', poolLimit: number, dapiUrl?: string | string[]): Promise<void> {
         if (typeof dapiUrl === 'string') {
-            this.channels = [createChannel(dapiUrl)]
+            this.dapiUrls = [dapiUrl]
 
             return
         }
 
         if (Array.isArray(dapiUrl)) {
-            this.channels = dapiUrl.map(dapiUrl => createChannel(dapiUrl))
+            this.dapiUrls = dapiUrl
 
             return
         }
@@ -79,7 +83,7 @@ export default class GRPCConnectionPool {
         }
 
         // Add default seed nodes
-        this.channels = (seedNodes[network].map((dapiUrl: string) => createChannel(dapiUrl)))
+        this.dapiUrls = seedNodes[network]
 
         // retrieve last evonodes list
         const evonodeList = await getEvonodeList(network)
@@ -96,25 +100,26 @@ export default class GRPCConnectionPool {
 
         // healthcheck nodes
         for (const url of networkDAPIUrls) {
-            if (this.channels.length > poolLimit) {
+            if (this.dapiUrls.length > poolLimit) {
                 break
             }
 
             try {
-                const channel = createChannel(url)
-                const client = createClient(CoreDefinition, channel)
-                const response: GetBlockchainStatusResponse = await client.getBlockchainStatus(GetBlockchainStatusRequest.fromPartial({ v0: {} }))
+                const client = createClient(url)
+
+                const {response} = await client.getBlockchainStatus( GetBlockchainStatusRequest.fromJson({ v0: {} }))
 
                 if (response.status === GetBlockchainStatusResponse_Status.READY) {
-                    this.channels.push(createChannel(url))
+                    this.dapiUrls.push(url)
                 }
             } catch (e) {
             }
         }
     }
 
-    getClient (): Client<CoreDefinition> {
-        const channel = getRandomArrayItem(this.channels)
-        return createClient(CoreDefinition, channel)
+    getClient (abortController?: AbortController): CoreClient {
+        const dapiUrl =  getRandomArrayItem(this.dapiUrls)
+
+        return createClient(dapiUrl, abortController)
     }
 }
