@@ -1,6 +1,7 @@
 import {DashCoreSDK, BloomFilter} from "./src/DashCoreSDK.js";
 import {base58} from '@scure/base'
 import bloomFilter from 'bloom-filter'
+import {hexToBytes} from "./src/utils";
 
 const getVarIntBuffer = function (n) {
     let dataView;
@@ -68,6 +69,30 @@ const run = async () => {
     if (status.chain?.bestBlockHash == null) {
         throw new Error("Best block hash not available")
     }
+
+    const transaction = await sdk.getTransaction('2e8eaa85fdaa036097caa42a41a23c73d7d7761f1fa6c934c024839bbe39786d');
+    console.log(`tx confirmations: ${transaction.confirmations}`);
+
+    try {
+        const mnStatus = await sdk.getMasternodeStatus()
+    } catch (err) {
+        console.log('this node doesn\'t contains active masternode')
+    }
+
+    const blockByHash = await sdk.getBlock({hash: '000000048fb130ac12fb4b985c89b49722261bbe807c76438c400c018581a3fe'})
+    const blockByHeight = await sdk.getBlock({height: 1354927})
+    if (JSON.stringify(Array.from(blockByHeight.block)) === JSON.stringify(Array.from(blockByHash.block)) && blockByHeight.block.byteLength !== 0) {
+        console.log(`block founded by hash and height: 000000048fb130ac12fb4b985c89b49722261bbe807c76438c400c018581a3fe and 1354927`)
+    } else {
+        console.log('blocks not found')
+    }
+
+    const bestBlockHeight = await sdk.getBestBlockHeight()
+    console.log(`bestBlockHeight: ${bestBlockHeight.height}`)
+
+    // const estimatedTransactionFee = await sdk.getEstimatedTransactionFee(1)
+    // console.log(`estimatedTransactionFee: ${estimatedTransactionFee.fee}`)
+
     const abortController = new AbortController()
     //
     // const stream = sdk.subscribeToTransactions(addresses)
@@ -93,9 +118,9 @@ const run = async () => {
     // }
 
 
-   // const stream = sdk.subscribeToTransactionsWithProofs({...bf.toObject()}, 0, true, status.chain?.bestBlockHash, 0, abortController)
+    // const stream = sdk.subscribeToTransactionsWithProofs({...bf.toObject()}, 0, true, status.chain?.bestBlockHash, 0, abortController)
     const stream = sdk.subscribeToMasternodeList()
-   // setTimeout(() => abortController.abort('Timed out'), 3000)
+    // setTimeout(() => abortController.abort('Timed out'), 3000)
 
     try {
         for await (const response of stream.responses) {
@@ -105,8 +130,6 @@ const run = async () => {
         console.error(e)
         return
     }
-
-
 }
 
 
