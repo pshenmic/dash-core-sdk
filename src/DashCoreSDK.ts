@@ -1,11 +1,15 @@
 import GRPCConnectionPool from "./grpcConnectionPool.js";
 import {
     BlockHeadersWithChainLocksRequest,
-    BlockHeadersWithChainLocksResponse,
+    BlockHeadersWithChainLocksResponse, BroadcastTransactionRequest,
+    BroadcastTransactionResponse, GetBestBlockHeightRequest, GetBestBlockHeightResponse,
     GetBlockchainStatusRequest,
-    GetBlockchainStatusResponse, MasternodeListRequest,
+    GetBlockchainStatusResponse, GetBlockRequest, GetBlockResponse,
+    GetEstimatedTransactionFeeRequest, GetEstimatedTransactionFeeResponse, GetMasternodeStatusRequest,
+    GetMasternodeStatusResponse, GetTransactionRequest, MasternodeListRequest,
     TransactionsWithProofsRequest
 } from "../proto/generated/core.js";
+import type {JsonValue} from "@protobuf-ts/runtime/build/types/json-typings";
 
 interface Transaction {
     transaction: Uint8Array;
@@ -14,6 +18,11 @@ interface Transaction {
     confirmations: number;
     isInstantLocked: boolean;
     isChainLocked: boolean;
+}
+
+interface BlockRequest {
+    hash?: string;
+    height?: number;
 }
 
 export interface BloomFilter {
@@ -32,7 +41,9 @@ export class DashCoreSDK {
     }
 
     async getTransaction(txid: string): Promise<Transaction> {
-        throw new Error('Not implemented');
+        const client = this.grpcConnectionPool.getClient()
+
+        return (await client.getTransaction(GetTransactionRequest.fromJson({id: txid}))).response
     }
 
     async getBlockchainStatus(): Promise<GetBlockchainStatusResponse> {
@@ -41,27 +52,50 @@ export class DashCoreSDK {
         return (await client.getBlockchainStatus(GetBlockchainStatusRequest.fromJson({}))).response
     }
 
-    async getMasternodeStatus() {
-        throw new Error('Not implemented');
+    async getMasternodeStatus(): Promise<GetMasternodeStatusResponse> {
+        const client = this.grpcConnectionPool.getClient();
+
+        return (await client.getMasternodeStatus(GetMasternodeStatusRequest.fromJson({}))).response
     }
 
-    async getBlock() {
-        throw new Error('Not implemented');
+    async getBlock({hash, height}: { hash?: string, height?: number }): Promise<GetBlockResponse> {
+        if (!hash && !height) {
+            throw new Error("Hash or height cannot be undefined or null");
+        }
+
+        const client = this.grpcConnectionPool.getClient();
+
+        const req: BlockRequest = {}
+
+        if (hash) {
+            req.hash = hash;
+        } else {
+            req.height = height;
+        }
+
+        return (await client.getBlock(GetBlockRequest.fromJson({...req}))).response
     }
 
-    async getBestBlockHeight() {
-        throw new Error('Not implemented');
+    async getBestBlockHeight(): Promise<GetBestBlockHeightResponse> {
+        const client = this.grpcConnectionPool.getClient();
 
+        return (await client.getBestBlockHeight(GetBestBlockHeightRequest.fromJson({}))).response
     }
 
-    async broadcastTransaction() {
+    async broadcastTransaction(transaction: Uint8Array, allowHighFees?: boolean, bypassLimits?: boolean): Promise<BroadcastTransactionResponse> {
+        const client = this.grpcConnectionPool.getClient();
 
-        throw new Error('Not implemented');
+        return (await client.broadcastTransaction(BroadcastTransactionRequest.create({
+            transaction: transaction,
+            allowHighFees: allowHighFees ?? false,
+            bypassLimits: bypassLimits ?? false,
+        }))).response
     }
 
-    async getEstimatedTransactionFee() {
-        throw new Error('Not implemented');
+    async getEstimatedTransactionFee(blocks: number): Promise<GetEstimatedTransactionFeeResponse> {
+        const client = this.grpcConnectionPool.getClient();
 
+        return (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({blocks}))).response
     }
 
     subscribeToBlockHeadersWithChainLocks(count: number = 0, fromBlockHash?: Uint8Array, fromBlockHeight?: number): AsyncIterable<BlockHeadersWithChainLocksResponse> {
@@ -80,21 +114,22 @@ export class DashCoreSDK {
         // return stream
     }
 
-      subscribeToTransactions(addresses: string[]): ReadableStream {
+    subscribeToTransactions(addresses: string[]): ReadableStream {
         // todo validate
 
-          return new ReadableStream({
-              start(controller) {
-                  setTimeout(() => {
-                      controller.enqueue("test");
-                      controller.close()
-                  }, 1000)
-              },
-              cancel() {
-              },
-          })
-      }
-     subscribeToTransactionsWithProofs(bloomFilter: BloomFilter, count: number, sendTransactionHashes: boolean, fromBlockHash: Uint8Array, fromBlockHeight: number, abortController: AbortController) {
+        return new ReadableStream({
+            start(controller) {
+                setTimeout(() => {
+                    controller.enqueue("test");
+                    controller.close()
+                }, 1000)
+            },
+            cancel() {
+            },
+        })
+    }
+
+    subscribeToTransactionsWithProofs(bloomFilter: BloomFilter, count: number, sendTransactionHashes: boolean, fromBlockHash: Uint8Array, fromBlockHeight: number, abortController: AbortController) {
         const client = this.grpcConnectionPool.getClient(abortController);
 
         const bloomFilter1 = {
@@ -113,15 +148,14 @@ export class DashCoreSDK {
             sendTransactionHashes
         })
 
-       return client.subscribeToTransactionsWithProofs(request)
+        return client.subscribeToTransactionsWithProofs(request)
     }
 
-     subscribeToMasternodeList() {
+    subscribeToMasternodeList() {
         const client = this.grpcConnectionPool.getClient();
 
 
-        const request = MasternodeListRequest.create({
-        })
+        const request = MasternodeListRequest.create({})
 
         return client.subscribeToMasternodeList(request)
     }

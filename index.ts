@@ -1,6 +1,7 @@
 import {DashCoreSDK, BloomFilter} from "./src/DashCoreSDK.js";
 import {base58} from '@scure/base'
 import bloomFilter from 'bloom-filter'
+import {hexToBytes} from "./src/utils";
 
 const getVarIntBuffer = function (n) {
     let dataView;
@@ -68,6 +69,33 @@ const run = async () => {
     if (status.chain?.bestBlockHash == null) {
         throw new Error("Best block hash not available")
     }
+
+    const transaction = await sdk.getTransaction('2e8eaa85fdaa036097caa42a41a23c73d7d7761f1fa6c934c024839bbe39786d');
+    console.log(`tx confirmations: ${transaction.confirmations}`);
+
+    try {
+        const mnStatus = await sdk.getMasternodeStatus()
+    }catch(err) {
+        console.log('this node doesn\'t contains active masternode')
+    }
+
+    const blockByHash = await sdk.getBlock({hash: '000000048fb130ac12fb4b985c89b49722261bbe807c76438c400c018581a3fe'})
+    const blockByHeight = await sdk.getBlock({height: 1354927})
+    if(JSON.stringify(Array.from(blockByHeight.block)) === JSON.stringify(Array.from(blockByHash.block)) && blockByHeight.block.byteLength !== 0) {
+        console.log(`block founded by hash and height: 000000048fb130ac12fb4b985c89b49722261bbe807c76438c400c018581a3fe and 1354927`)
+    }else{
+        console.log('blocks not found')
+    }
+
+    const bestBlockHeight = await sdk.getBestBlockHeight()
+    console.log(`bestBlockHeight: ${bestBlockHeight.height}`)
+
+    // const estimatedTransactionFee = await sdk.getEstimatedTransactionFee(1)
+    // console.log(`estimatedTransactionFee: ${estimatedTransactionFee.fee}`)
+
+    // const broadcast = await sdk.broadcastTransaction(hexToBytes('000000010e0a8b020201964fa93bbfc815808c8c1e2340318679bc68e3071ee25c350c5f37802a7cf26a0100000001af12041bdcf7aee99df6358a915c98f5a83f085effdc98d98041e2cd189e4ccc11087072656f72646572e668c659af66aee1e72c186dde7b5b7e0a1d712a09c40d5721f622bf53c53155009cd1216cb718613e829750a8c3d17b535c28b53d44435a815e703c8aa366faaf011073616c746564446f6d61696e486173680a20758088f73e46cb8ebd34afc577b4c23de3a1ef5d3838f220554d097069a1cfc7000101411fc934588aa30c58acdb347c7badf53e983c34ebc62c72a9475c118cf29b535a495ee06c6e603a48229759aecb5327d5a3361a0bfe9cba5b2dd4302f55f227bd57'))
+    // console.log(`broadcasted: ${broadcast.transactionId}`)
+
     const abortController = new AbortController()
     //
     // const stream = sdk.subscribeToTransactions(addresses)
@@ -105,8 +133,6 @@ const run = async () => {
         console.error(e)
         return
     }
-
-
 }
 
 

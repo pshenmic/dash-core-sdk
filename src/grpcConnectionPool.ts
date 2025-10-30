@@ -1,5 +1,5 @@
 import getEvonodeList from './getEvonodeList.js';
-import GrpcWebFetchTransport from '@protobuf-ts/grpcweb-transport/build/es2015/grpc-web-transport.js'
+import {GrpcWebFetchTransport} from '@protobuf-ts/grpcweb-transport/build/es2015/grpc-web-transport.js'
 import {getRandomArrayItem} from "./utils.js";
 import {CoreClient} from "../proto/generated/core.client";
 import {GetBlockchainStatusRequest, GetBlockchainStatusResponse_Status} from "../proto/generated/core";
@@ -47,7 +47,7 @@ const seedNodes = {
 }
 
 const createClient = (url: string, abortController?: AbortController): CoreClient => {
-    return new CoreClient(new GrpcWebFetchTransport.GrpcWebFetchTransport({
+    return new CoreClient(new GrpcWebFetchTransport({
         baseUrl: url,
         abort: abortController?.signal
     }))
