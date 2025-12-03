@@ -349,3 +349,10 @@ export enum Network {
 }
 
 export const DEFAULT_NETWORK = Network.Testnet
+
+export const WIFNetworkPrefix = {
+  204: Network.Mainnet,
+  239: Network.Testnet,
+  [Network.Mainnet]: 204,
+  [Network.Testnet]: 239
+}

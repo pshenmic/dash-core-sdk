@@ -1,10 +1,8 @@
 import {DEFAULT_NLOCK_TIME, NLOCK_TIME_BLOCK_BASED_LIMIT, TRANSACTION_VERSION, TransactionType} from "../constants";
 import {TransactionJSON} from "../types";
-import {Input} from "./input";
-import {Output} from "./output";
+import {Input} from "./Input";
+import {Output} from "./Output";
 import {bytesToHex, decodeCompactSize, doubleSHA256, encodeCompactSize, getCompactVariableSize} from "../utils";
-import * as signer from '@scure/btc-signer';
-import * as psbt from '@scure/btc-signer/psbt.js';
 
 export class Transaction {
   version: number
@@ -59,13 +57,13 @@ export class Transaction {
     return bytesToHex(doubleSHA256(this.bytes()).reverse())
   }
 
-  sign(privateKey: Uint8Array): Uint8Array {
-    const tx = signer.Transaction.fromRaw(this.bytes())
-
-    tx.sign(privateKey)
-
-    return tx.toBytes(true)
-  }
+  // sign(privateKey: Uint8Array): Uint8Array {
+  //   const tx = signer.Transaction.fromRaw(this.bytes())
+  //
+  //   tx.sign(privateKey)
+  //
+  //   return tx.toBytes(true)
+  // }
 
   toJSON(): TransactionJSON {
     return {

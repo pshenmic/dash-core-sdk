@@ -85,7 +85,7 @@ export function doubleSHA256(data: Uint8Array): Uint8Array {
   return new Uint8Array(new sha256().update(firstStage).digest())
 }
 
-export function RIPEMD160SHA256(data: Uint8Array): Uint8Array {
+export function SHA256RIPEMD160(data: Uint8Array): Uint8Array {
   const firstStage = new Uint8Array(new sha256().update(data).digest())
 
   return  new Uint8Array(new ripemd160().update(firstStage).digest())

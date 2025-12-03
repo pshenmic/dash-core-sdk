@@ -5,7 +5,7 @@ import {
   encodeCompactSize,
   getCompactVariableSize,
   hexToBytes,
-  RIPEMD160SHA256
+  SHA256RIPEMD160
 } from "../utils";
 import {DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES} from "../constants";
 import {Base58Check} from "../base58check";
@@ -102,7 +102,7 @@ export class Input {
       return undefined
     }
 
-    let pubKeyHash: Uint8Array = RIPEMD160SHA256(new Uint8Array(pubKeyHashChunk.data))
+    let pubKeyHash: Uint8Array = SHA256RIPEMD160(new Uint8Array(pubKeyHashChunk.data))
 
     const pubKeyHashWithPrefix = new Uint8Array(1 + pubKeyHash.byteLength)
 

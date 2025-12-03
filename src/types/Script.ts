@@ -1,7 +1,6 @@
-import {DEFAULT_NETWORK, Network, OPCODES, OPCODES_ENUM} from "../constants";
+import {OPCODES, OPCODES_ENUM} from "../constants";
 import {bytesToHex, hexToBytes} from "../utils";
 import {ScriptChunk} from "../types";
-import {Base58Check} from "../base58check";
 
 export class Script {
   #parsedScript: ScriptChunk[]

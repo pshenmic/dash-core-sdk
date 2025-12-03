@@ -13,11 +13,11 @@ export class Base58Check {
     return base58.encode(out)
   }
 
-  static decode(data: string, verify?: boolean) {
+  static decode(data: string, skipVerify?: boolean) {
     const bytes = base58.decode(data)
     const body = bytes.slice(0,-4)
 
-    if(verify) {
+    if(!skipVerify) {
       const passedChecksum = bytes.slice(-4)
       const correctedChecksum = doubleSHA256(body).slice(0,4)
 
