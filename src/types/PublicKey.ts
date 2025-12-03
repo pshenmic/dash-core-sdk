@@ -1,6 +1,7 @@
 import {PrivateKey} from "./PrivateKey";
 import {secp256k1} from "@noble/curves/secp256k1.js";
 import {bytesToHex, hexToBytes, SHA256RIPEMD160} from "../utils";
+import {Base58Check} from "../base58check";
 
 export class PublicKey {
   inner: Uint8Array
@@ -19,6 +20,10 @@ export class PublicKey {
     const inner = secp256k1.getPublicKey(privateKey.key, privateKey.compressed)
 
     return new PublicKey(inner, privateKey.compressed)
+  }
+
+  getAddress(): string {
+    return Base58Check.encode(SHA256RIPEMD160(this.inner))
   }
 
   hex(): string {
