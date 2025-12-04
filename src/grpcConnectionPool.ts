@@ -1,8 +1,8 @@
 import getEvonodeList from './getEvonodeList.js';
-import {GrpcWebFetchTransport} from '@protobuf-ts/grpcweb-transport/build/es2015/grpc-web-transport.js'
+import { GrpcWebFetchTransport } from '@protobuf-ts/grpcweb-transport'
 import {getRandomArrayItem} from "./utils.js";
-import {CoreClient} from "../proto/generated/core.client";
-import {GetBlockchainStatusRequest, GetBlockchainStatusResponse_Status} from "../proto/generated/core";
+import {CoreClient} from "../proto/generated/core.client.js";
+import {GetBlockchainStatusRequest, GetBlockchainStatusResponse_Status} from "../proto/generated/core.js";
 
 const GRPC_DEFAULT_POOL_LIMIT = 5
 export type MasternodeList = Record<string, MasternodeInfo>
