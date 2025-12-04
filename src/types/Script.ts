@@ -1,0 +1,183 @@
+import {OPCODES, OPCODES_ENUM} from "../constants";
+import {bytesToHex, hexToBytes} from "../utils";
+import {ScriptChunk} from "../types";
+
+export class Script {
+  #parsedScript: ScriptChunk[]
+
+  constructor(script?: Script | Uint8Array | string | ScriptChunk[]) {
+    if (!script) {
+      this.#parsedScript = []
+      return this
+    }
+
+    if (script instanceof Script) {
+      this.#parsedScript = [...script.parsedScriptChunks]
+      return this
+    }
+
+    if (ArrayBuffer.isView(script)) {
+      return Script.fromBytes(script)
+    }
+
+    if (typeof script === 'string') {
+      if(/^[0-9A-Fa-f]+$/.test(script)) {
+        return Script.fromHex(script)
+      }else{
+        return Script.fromASM(script)
+      }
+    }
+
+    if (Array.isArray(script)) {
+      this.#parsedScript = [...script]
+      return this
+    }
+  }
+
+  get parsedScriptChunks(): ScriptChunk[] {
+    return this.#parsedScript
+  }
+
+  set parsedScriptChunks(chunks: ScriptChunk[]) {
+    this.#parsedScript = chunks
+  }
+
+  addData(opCode: OPCODES_ENUM, data?: Uint8Array) {
+    this.#parsedScript.push({
+      opcode: OPCODES[opCode],
+      data: data?.buffer as ArrayBuffer,
+    })
+  }
+
+  static fromBytes(bytes: Uint8Array): Script {
+
+    // OP_DUP OP_HASH160 OP_PUSHBYTES_20 a3890b802865e1cfeed7653d0fea33831d709b6f OP_EQUALVERIFY OP_CHECKSIG
+
+    //76a914a3890b802865e1cfeed7653d0fea33831d709b6f88ac
+    //stack operator  cryptography  push_data                 data                         Bitwise Logic    cryptography
+    //76                a9              14       a3890b802865e1cfeed7653d0fea33831d709b6f      88              ac
+
+    const chunks: ScriptChunk[] = []
+
+    const dataView = new DataView(bytes.buffer)
+
+    for (let i = 0; i < bytes.length; i++) {
+      const opcode = dataView.getUint8(i)
+
+      let chunk: ScriptChunk = {
+        opcode: opcode,
+      }
+
+      if (opcode < OPCODES.OP_PUSHDATA1 && opcode > 0) {
+        // process OP_PUSHBYTES_X
+
+        chunk.data = dataView.buffer.slice(i + 1, i + 1 + opcode) as ArrayBuffer
+
+        i += opcode
+      } else if (opcode === OPCODES.OP_PUSHDATA1) {
+        const bytesForPush = dataView.getUint8(i + 1)
+
+        chunk.data = dataView.buffer.slice(i + 1, i + 1 + bytesForPush) as ArrayBuffer
+        i += bytesForPush
+      } else if (opcode === OPCODES.OP_PUSHDATA2) {
+        const bytesForPush = dataView.getUint16(i + 1, true)
+
+        chunk.data = dataView.buffer.slice(i + 3, i + 3 + bytesForPush) as ArrayBuffer
+        i += bytesForPush + 2
+      } else if (opcode === OPCODES.OP_PUSHDATA4) {
+        const bytesForPush = dataView.getUint32(i + 1, true)
+
+        chunk.data = dataView.buffer.slice(i + 5, i + 5 + bytesForPush) as ArrayBuffer
+        i += bytesForPush + 4
+      }
+
+      chunks.push(chunk)
+    }
+
+    return new Script(chunks)
+  }
+
+  static fromHex(hex: string): Script {
+    return this.fromBytes(hexToBytes(hex))
+  }
+
+  static fromASM(asm: string): Script {
+    const scriptChunks: ScriptChunk[] = []
+
+    const chunks: string[] = asm.split(' ')
+
+    for (let i = 0; i < chunks.length; i++) {
+      const opcode = OPCODES[chunks[i]]
+
+      if (opcode === undefined) {
+        throw new Error("Cannot parse asm string")
+      }
+
+      if (opcode > 0 && opcode <= OPCODES.OP_PUSHDATA4) {
+        scriptChunks.push({
+          opcode: opcode,
+          data: hexToBytes(chunks[i + 1]).buffer as ArrayBuffer
+        })
+
+        i++
+      } else {
+        scriptChunks.push({
+          opcode: opcode,
+        })
+      }
+    }
+
+    return new Script(scriptChunks)
+  }
+
+  ASMString(): string {
+    const out: string[] = []
+
+    for (let i = 0; i < this.#parsedScript.length; i++) {
+      const chunk = this.#parsedScript[i]
+
+      const opcode_human_readable = Object.keys(OPCODES)[Object.values(OPCODES).indexOf(chunk.opcode)];
+      const data_human_readable = chunk.data ? bytesToHex(new Uint8Array(chunk.data)) : undefined
+
+      out.push(opcode_human_readable)
+
+      if (data_human_readable) {
+        out.push(data_human_readable)
+      }
+    }
+
+    return out.join(' ')
+  }
+
+  bytes(): Uint8Array<ArrayBufferLike> {
+    let out: Uint8Array = new Uint8Array<ArrayBuffer>(new ArrayBuffer(0));
+
+    for (let i = 0; i < this.#parsedScript.length; i++) {
+      const chunk = this.#parsedScript[i]
+
+      const {data} = chunk
+
+      const dataLength = data?.byteLength ?? 0
+
+      const tmpBytes = new Uint8Array(1 + dataLength + out.byteLength)
+
+      tmpBytes.set(out, 0)
+
+      tmpBytes.set([chunk.opcode], out.byteLength)
+
+      if (chunk.data) {
+        tmpBytes.set(new Uint8Array(chunk.data), out.byteLength + 1)
+      }
+
+      out = tmpBytes
+    }
+
+    return out
+  }
+
+  hex(): string {
+    const bytes = this.bytes()
+
+    return bytesToHex(bytes)
+  }
+}
