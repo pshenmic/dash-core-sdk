@@ -13,7 +13,11 @@ export class PublicKey {
   }
 
   getPublicKeyHash(): string {
-    return bytesToHex(SHA256RIPEMD160(this.inner))
+    return bytesToHex(this.getPublicKeyHashBytes())
+  }
+
+  getPublicKeyHashBytes(): Uint8Array {
+    return SHA256RIPEMD160(this.inner)
   }
 
   static fromPrivateKey(privateKey: PrivateKey): PublicKey {

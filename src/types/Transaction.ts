@@ -2,7 +2,14 @@ import {DEFAULT_NLOCK_TIME, NLOCK_TIME_BLOCK_BASED_LIMIT, TRANSACTION_VERSION, T
 import {TransactionJSON} from "../types";
 import {Input} from "./Input";
 import {Output} from "./Output";
-import {bytesToHex, decodeCompactSize, doubleSHA256, encodeCompactSize, getCompactVariableSize} from "../utils";
+import {
+  bytesToHex,
+  decodeCompactSize,
+  doubleSHA256,
+  encodeCompactSize,
+  getCompactVariableSize,
+  hexToBytes
+} from "../utils";
 
 export class Transaction {
   version: number
@@ -53,8 +60,8 @@ export class Transaction {
     }, BigInt(0))
   }
 
-  hash(): string {
-    return bytesToHex(doubleSHA256(this.bytes()).reverse())
+  id(): string {
+    return bytesToHex(doubleSHA256(this.bytes()).toReversed())
   }
 
   // sign(privateKey: Uint8Array): Uint8Array {
@@ -71,59 +78,6 @@ export class Transaction {
       type: this.type,
       nLockTime: this.#nLockTime,
     }
-  }
-
-  static fromBytes(bytes: Uint8Array): Transaction {
-    // 4 bytes version & type packed
-    // varint input count
-    // inputs
-    // varint output count
-    // outputs
-    // nLockTime
-
-    const dataView = new DataView(bytes.buffer)
-
-    const versionWithType = dataView.getInt32(0, true)
-    const version = versionWithType & 0xffff
-    const type = (versionWithType >> 16) & 0xffff
-
-    const inputCount = decodeCompactSize(4, bytes)
-    const inputCountSize = getCompactVariableSize(inputCount)
-
-    const inputsPadding = 4 + inputCountSize
-
-    const inputs: Input[] = []
-
-    for (let i = BigInt(0); i < inputCount; i++) {
-      const offset = inputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
-
-      const input = Input.fromBytes(bytes.slice(inputsPadding + offset))
-
-      inputs.push(input)
-    }
-
-    const outputCountPadding = inputs.reduce((acc, curr) => acc + curr.bytes().byteLength, inputsPadding)
-
-    const outputCount = decodeCompactSize(outputCountPadding, bytes)
-    const outputCountSize = getCompactVariableSize(outputCount)
-
-    const outputsPadding = outputCountPadding + outputCountSize
-
-    const outputs: Output[] = []
-
-    for (let i = BigInt(0); i < outputCount; i++) {
-      const offset = outputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
-
-      const output = Output.fromBytes(bytes.slice(outputsPadding + offset))
-
-      outputs.push(output)
-    }
-
-    const lockTimePadding = outputCountPadding + outputCountSize + outputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
-
-    const nLockTime = dataView.getUint32(lockTimePadding, true)
-
-    return new Transaction(inputs, outputs, nLockTime, version, type)
   }
 
   bytes(): Uint8Array {
@@ -183,5 +137,66 @@ export class Transaction {
     out.set(new Uint8Array(lockTimeView.buffer), 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize)
 
     return out
+  }
+
+  hex(): string {
+    return bytesToHex(this.bytes())
+  }
+
+  static fromBytes(bytes: Uint8Array): Transaction {
+    // 4 bytes version & type packed
+    // varint input count
+    // inputs
+    // varint output count
+    // outputs
+    // nLockTime
+
+    const dataView = new DataView(bytes.buffer)
+
+    const versionWithType = dataView.getInt32(0, true)
+    const version = versionWithType & 0xffff
+    const type = (versionWithType >> 16) & 0xffff
+
+    const inputCount = decodeCompactSize(4, bytes)
+    const inputCountSize = getCompactVariableSize(inputCount)
+
+    const inputsPadding = 4 + inputCountSize
+
+    const inputs: Input[] = []
+
+    for (let i = BigInt(0); i < inputCount; i++) {
+      const offset = inputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
+
+      const input = Input.fromBytes(bytes.slice(inputsPadding + offset))
+
+      inputs.push(input)
+    }
+
+    const outputCountPadding = inputs.reduce((acc, curr) => acc + curr.bytes().byteLength, inputsPadding)
+
+    const outputCount = decodeCompactSize(outputCountPadding, bytes)
+    const outputCountSize = getCompactVariableSize(outputCount)
+
+    const outputsPadding = outputCountPadding + outputCountSize
+
+    const outputs: Output[] = []
+
+    for (let i = BigInt(0); i < outputCount; i++) {
+      const offset = outputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
+
+      const output = Output.fromBytes(bytes.slice(outputsPadding + offset))
+
+      outputs.push(output)
+    }
+
+    const lockTimePadding = outputCountPadding + outputCountSize + outputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
+
+    const nLockTime = dataView.getUint32(lockTimePadding, true)
+
+    return new Transaction(inputs, outputs, nLockTime, version, type)
+  }
+
+  static fromHex(hex: string): Transaction {
+    return Transaction.fromBytes(hexToBytes(hex))
   }
 }
