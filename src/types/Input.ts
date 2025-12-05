@@ -1,4 +1,4 @@
-import {Script} from "./script";
+import {Script} from "./Script";
 import {
   bytesToHex,
   decodeCompactSize,
@@ -31,7 +31,7 @@ export class Input {
   }
 
   getTxIdHex(): string {
-    return bytesToHex(this.txId.reverse())
+    return bytesToHex(this.txId.toReversed())
   }
 
   bytes(): Uint8Array {

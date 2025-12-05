@@ -356,3 +356,8 @@ export const WIFNetworkPrefix = {
   [Network.Mainnet]: 204,
   [Network.Testnet]: 239
 }
+
+export const MAX_BLOOM_FILTER_SIZE = 36000
+export const MAX_BLOOM_FILTER_FUNC_COUNT = 50
+export const BLOOM_FILTER_FBA_CONSTANT = 0xfba4c795;
+export const BLOOM_FILTER_FALSE_POSITIVE_RATE = 0.0001;
