@@ -357,7 +357,10 @@ export const WIFNetworkPrefix = {
   [Network.Testnet]: 239
 }
 
+export const MAX_BLOCK_WEIGHT = 4000000
+export const MIN_TRANSACTION_WEIGHT = 4*60
+
 export const MAX_BLOOM_FILTER_SIZE = 36000
 export const MAX_BLOOM_FILTER_FUNC_COUNT = 50
-export const BLOOM_FILTER_FBA_CONSTANT = 0xfba4c795;
-export const BLOOM_FILTER_FALSE_POSITIVE_RATE = 0.0001;
+export const BLOOM_FILTER_FBA_CONSTANT = 0xfba4c795
+export const BLOOM_FILTER_FALSE_POSITIVE_RATE = 0.0001
