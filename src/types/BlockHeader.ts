@@ -1,4 +1,4 @@
-import {bytesToHex} from "../utils";
+import { bytesToHex } from '../utils'
 
 export class BlockHeader {
   version: number
@@ -8,7 +8,7 @@ export class BlockHeader {
   nBits: number
   nonce: number
 
-  constructor(version: number, previousBlockHash: string, merkleRoot: string, time: number, nBits: number, nonce: number) {
+  constructor (version: number, previousBlockHash: string, merkleRoot: string, time: number, nBits: number, nonce: number) {
     this.version = version
     this.previousBlockHash = previousBlockHash
     this.merkleRoot = merkleRoot
@@ -17,7 +17,7 @@ export class BlockHeader {
     this.nonce = nonce
   }
 
-  static fromBytes(bytes: Uint8Array) {
+  static fromBytes (bytes: Uint8Array): BlockHeader {
     const dataView = new DataView(bytes.buffer)
 
     const version = dataView.getUint32(0, true)
@@ -31,5 +31,4 @@ export class BlockHeader {
 
     return new BlockHeader(version, bytesToHex(previousBlockHash), bytesToHex(merkleRoot), time, nBits, nonce)
   }
-
 }

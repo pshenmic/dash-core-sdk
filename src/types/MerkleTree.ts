@@ -1,22 +1,22 @@
-import {bytesToHex, decodeCompactSize, doubleSHA256, getCompactVariableSize, hexToBytes} from "../utils";
-import {MAX_BLOCK_WEIGHT, MIN_TRANSACTION_WEIGHT} from "../constants";
+import { bytesToHex, decodeCompactSize, doubleSHA256, getCompactVariableSize, hexToBytes } from '../utils'
+import { MAX_BLOCK_WEIGHT, MIN_TRANSACTION_WEIGHT } from '../constants'
 
 export class MerkleTree {
   transactionCount: number
   hashes: Uint8Array[]
   flags: boolean[]
 
-  constructor(transactionCount: number, hashes: Uint8Array[], flags: boolean[]) {
+  constructor (transactionCount: number, hashes: Uint8Array[], flags: boolean[]) {
     this.transactionCount = transactionCount
     this.hashes = hashes
     this.flags = flags
   }
 
-  calcTreeWidth(height: number): number {
+  calcTreeWidth (height: number): number {
     return (this.transactionCount + (1 << height) - 1) >> height
   }
 
-  calcHash(height: number, pos: number, txIds: Uint8Array[]): Uint8Array {
+  calcHash (height: number, pos: number, txIds: Uint8Array[]): Uint8Array {
     if (height === 0) {
       return txIds[pos]
     } else {
@@ -34,7 +34,7 @@ export class MerkleTree {
     }
   }
 
-  parentHash(left: Uint8Array, right: Uint8Array): Uint8Array {
+  parentHash (left: Uint8Array, right: Uint8Array): Uint8Array {
     const union = new Uint8Array(left.byteLength + right.byteLength)
     union.set(left, 0)
     union.set(right, left.byteLength)
@@ -42,24 +42,24 @@ export class MerkleTree {
     return doubleSHA256(union)
   }
 
-  extractMatches(matches: Uint8Array[], indexes: number[]) {
+  extractMatches (matches: Uint8Array[], indexes: number[]): Uint8Array {
     matches.length = 0
     indexes.length = 0
 
     if (this.transactionCount === 0) {
-      throw new Error("Merkle Tree does not contain transactions")
+      throw new Error('Merkle Tree does not contain transactions')
     }
 
     if (this.transactionCount > MAX_BLOCK_WEIGHT / MIN_TRANSACTION_WEIGHT) {
-      throw new Error("Too many transactions in Merkle Tree")
+      throw new Error('Too many transactions in Merkle Tree')
     }
 
     if (this.hashes.length > this.transactionCount) {
-      throw new Error("Too many hashes in Merkle Tree")
+      throw new Error('Too many hashes in Merkle Tree')
     }
 
     if (this.flags.length < this.hashes.length) {
-      throw new Error("Not enough flags in Merkle Tree")
+      throw new Error('Not enough flags in Merkle Tree')
     }
 
     let height = 0
@@ -73,13 +73,13 @@ export class MerkleTree {
     return this.traverseAndExtract(height, 0, matches, indexes, state)
   }
 
-  traverseAndExtract(height: number, pos: number, matches: Uint8Array[], indexes: number[], state: {bitsUsed: number, hashUsed: number},): Uint8Array {
+  traverseAndExtract (height: number, pos: number, matches: Uint8Array[], indexes: number[], state: { bitsUsed: number, hashUsed: number }): Uint8Array {
     if (state.bitsUsed >= this.flags.length) {
       throw new Error('MerkleTree: traverseAndExtract(): flags overflow')
     }
 
     const parentFlag = this.flags[state.bitsUsed]
-    state.bitsUsed+=1
+    state.bitsUsed += 1
 
     if (height === 0 || !parentFlag) {
       if (state.hashUsed >= this.hashes.length) {
@@ -87,7 +87,7 @@ export class MerkleTree {
       }
 
       const hash = this.hashes[state.hashUsed]
-      state.hashUsed+=1
+      state.hashUsed += 1
 
       if (height === 0 && parentFlag) {
         matches.push(hash)
@@ -119,7 +119,7 @@ export class MerkleTree {
     }
   }
 
-  static fromBytes(bytes: Uint8Array): MerkleTree {
+  static fromBytes (bytes: Uint8Array): MerkleTree {
     const dataView = new DataView(bytes.buffer)
 
     const transactionCount = dataView.getUint32(0, true)
@@ -150,7 +150,7 @@ export class MerkleTree {
     return new MerkleTree(Number(transactionCount), hashes, flags)
   }
 
-  static fromHex(hex: string): MerkleTree {
+  static fromHex (hex: string): MerkleTree {
     return MerkleTree.fromBytes(hexToBytes(hex))
   }
 }

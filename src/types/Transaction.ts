@@ -1,7 +1,7 @@
-import {DEFAULT_NLOCK_TIME, NLOCK_TIME_BLOCK_BASED_LIMIT, TRANSACTION_VERSION, TransactionType} from "../constants";
-import {TransactionJSON} from "../types";
-import {Input} from "./Input";
-import {Output} from "./Output";
+import { DEFAULT_NLOCK_TIME, NLOCK_TIME_BLOCK_BASED_LIMIT, TRANSACTION_VERSION, TransactionType } from '../constants'
+import { TransactionJSON } from '../types'
+import { Input } from './Input'
+import { Output } from './Output'
 import {
   bytesToHex,
   decodeCompactSize,
@@ -9,7 +9,7 @@ import {
   encodeCompactSize,
   getCompactVariableSize,
   hexToBytes
-} from "../utils";
+} from '../utils'
 
 export class Transaction {
   version: number
@@ -18,9 +18,9 @@ export class Transaction {
   inputs: Input[]
   outputs: Output[]
 
-  //TODO: payload
+  // TODO: payload
 
-  constructor(inputs: Input[], outputs: Output[], nLockTime: number, version: number, type: TransactionType) {
+  constructor (inputs: Input[], outputs: Output[], nLockTime: number, version: number, type: TransactionType) {
     this.version = version ?? TRANSACTION_VERSION
     this.type = type ?? TransactionType.TRANSACTION_NORMAL
     this.#nLockTime = nLockTime ?? DEFAULT_NLOCK_TIME
@@ -28,15 +28,15 @@ export class Transaction {
     this.outputs = outputs
   }
 
-  get nLockTime(): Date | number {
+  get nLockTime (): Date | number {
     if (this.#nLockTime < NLOCK_TIME_BLOCK_BASED_LIMIT) {
       return this.#nLockTime
     } else {
-      return this.#nLockTime ? new Date(this.#nLockTime) : this.#nLockTime
+      return !isNaN(this.#nLockTime) ? new Date(this.#nLockTime) : this.#nLockTime
     }
   }
 
-  set nLockTime(nLockTime: number | Date) {
+  set nLockTime (nLockTime: number | Date) {
     if (nLockTime instanceof Date) {
       this.#nLockTime = nLockTime.getTime()
       return
@@ -48,19 +48,19 @@ export class Transaction {
     }
 
     if (nLockTime < 0) {
-      throw new Error(`nLockTime must be greater than 0`)
+      throw new Error('nLockTime must be greater than 0')
     }
 
     this.#nLockTime = nLockTime
   }
 
-  getOutputAmount(): bigint {
+  getOutputAmount (): bigint {
     return this.outputs.reduce((acc, curr) => {
       return acc + curr.satoshis
     }, BigInt(0))
   }
 
-  id(): string {
+  id (): string {
     return bytesToHex(doubleSHA256(this.bytes()).toReversed())
   }
 
@@ -72,15 +72,15 @@ export class Transaction {
   //   return tx.toBytes(true)
   // }
 
-  toJSON(): TransactionJSON {
+  toJSON (): TransactionJSON {
     return {
       version: this.version,
       type: this.type,
-      nLockTime: this.#nLockTime,
+      nLockTime: this.#nLockTime
     }
   }
 
-  bytes(): Uint8Array {
+  bytes (): Uint8Array {
     // 4 bytes version & type packed
     // varint input count
     // inputs
@@ -139,11 +139,11 @@ export class Transaction {
     return out
   }
 
-  hex(): string {
+  hex (): string {
     return bytesToHex(this.bytes())
   }
 
-  static fromBytes(bytes: Uint8Array): Transaction {
+  static fromBytes (bytes: Uint8Array): Transaction {
     // 4 bytes version & type packed
     // varint input count
     // inputs
@@ -196,7 +196,7 @@ export class Transaction {
     return new Transaction(inputs, outputs, nLockTime, version, type)
   }
 
-  static fromHex(hex: string): Transaction {
+  static fromHex (hex: string): Transaction {
     return Transaction.fromBytes(hexToBytes(hex))
   }
 }

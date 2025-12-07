@@ -1,4 +1,4 @@
-import {Script} from "./Script";
+import { Script } from './Script'
 import {
   bytesToHex,
   decodeCompactSize,
@@ -6,9 +6,9 @@ import {
   getCompactVariableSize,
   hexToBytes,
   SHA256RIPEMD160
-} from "../utils";
-import {DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES} from "../constants";
-import {Base58Check} from "../base58check";
+} from '../utils'
+import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES } from '../constants'
+import { Base58Check } from '../base58check'
 
 export class Input {
   txId: Uint8Array
@@ -16,8 +16,8 @@ export class Input {
   scriptSig: Script
   sequence: number
 
-  constructor(txId: string | Uint8Array, vout: number, scriptSig: Script, sequence: number) {
-    if (typeof txId === "string") {
+  constructor (txId: string | Uint8Array, vout: number, scriptSig: Script, sequence: number) {
+    if (typeof txId === 'string') {
       this.txId = hexToBytes(txId)
     } else if (ArrayBuffer.isView(txId)) {
       this.txId = txId
@@ -30,11 +30,11 @@ export class Input {
     this.sequence = sequence
   }
 
-  getTxIdHex(): string {
+  getTxIdHex (): string {
     return bytesToHex(this.txId.toReversed())
   }
 
-  bytes(): Uint8Array {
+  bytes (): Uint8Array {
     const txIdBytes = this.txId
     const voutBytes = new DataView(new ArrayBuffer(4))
     const scriptSigBytes = this.scriptSig.bytes()
@@ -55,7 +55,7 @@ export class Input {
     return bytes
   }
 
-  static fromBytes(bytes: Uint8Array): Input {
+  static fromBytes (bytes: Uint8Array): Input {
     const txIdBytes = bytes.slice(0, 32)
 
     const voutBytes = new DataView(bytes.slice(32, 36).buffer)
@@ -75,17 +75,17 @@ export class Input {
     )
   }
 
-  hex() {
+  hex (): string {
     return bytesToHex(this.bytes())
   }
 
-  static fromHex(hex: string) {
+  static fromHex (hex: string): Input {
     return Input.fromBytes(hexToBytes(hex))
   }
 
-  getAddress(network: Network = DEFAULT_NETWORK): string | undefined {
+  getAddress (network: Network = DEFAULT_NETWORK): string | undefined {
     if (network > 255) {
-      throw new Error("Network prefix cannot be more than 255")
+      throw new Error('Network prefix cannot be more than 255')
     }
 
     const cryptoOpCodes = [OPCODES.OP_PUSHBYTES_33, OPCODES.OP_PUSHBYTES_65]
@@ -102,7 +102,7 @@ export class Input {
       return undefined
     }
 
-    let pubKeyHash: Uint8Array = SHA256RIPEMD160(new Uint8Array(pubKeyHashChunk.data))
+    const pubKeyHash: Uint8Array = SHA256RIPEMD160(new Uint8Array(pubKeyHashChunk.data))
 
     const pubKeyHashWithPrefix = new Uint8Array(1 + pubKeyHash.byteLength)
 
