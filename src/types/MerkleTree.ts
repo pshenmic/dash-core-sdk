@@ -1,5 +1,6 @@
 import { bytesToHex, decodeCompactSize, doubleSHA256, getCompactVariableSize, hexToBytes } from '../utils'
 import { MAX_BLOCK_WEIGHT, MIN_TRANSACTION_WEIGHT } from '../constants'
+import { MerkleTreeJSON } from '../types'
 
 export class MerkleTree {
   transactionCount: number
@@ -152,5 +153,15 @@ export class MerkleTree {
 
   static fromHex (hex: string): MerkleTree {
     return MerkleTree.fromBytes(hexToBytes(hex))
+  }
+
+  toJSON (): MerkleTreeJSON {
+    const hashes = this.hashes.map(hash => bytesToHex(hash))
+
+    return {
+      transactionCount: this.transactionCount,
+      hashes,
+      flags: this.flags
+    }
   }
 }

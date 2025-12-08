@@ -105,17 +105,6 @@ export class Transaction {
   //   return tx.toBytes(true)
   // }
 
-  toJSON (): TransactionJSON {
-    return {
-      version: this.version,
-      type: this.type,
-      nLockTime: this.#nLockTime,
-      outputs: this.outputs.map(output => output.hex()),
-      inputs: this.inputs.map(input => input.hex()),
-      extraPayload: this.extraPayload != null ? bytesToHex(this.extraPayload) : null
-    }
-  }
-
   bytes (): Uint8Array {
     // 4 bytes version & type packed
     // varint input count
@@ -242,5 +231,16 @@ export class Transaction {
 
   static fromHex (hex: string): Transaction {
     return Transaction.fromBytes(hexToBytes(hex))
+  }
+
+  toJSON (): TransactionJSON {
+    return {
+      version: this.version,
+      type: this.type,
+      nLockTime: this.#nLockTime,
+      outputs: this.outputs.map(output => output.toJSON()),
+      inputs: this.inputs.map(input => input.toJSON()),
+      extraPayload: this.extraPayload != null ? bytesToHex(this.extraPayload) : null
+    }
   }
 }

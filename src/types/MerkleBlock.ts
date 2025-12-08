@@ -1,6 +1,7 @@
 import { BlockHeader } from './BlockHeader'
 import { MerkleTree } from './MerkleTree'
 import { hexToBytes } from '../utils'
+import { MerkleBlockJSON } from '../types'
 
 export class MerkleBlock {
   blockHeader: BlockHeader
@@ -21,5 +22,12 @@ export class MerkleBlock {
 
   static fromHex (hex: string): MerkleBlock {
     return MerkleBlock.fromBytes(hexToBytes(hex))
+  }
+
+  toJSON (): MerkleBlockJSON {
+    return {
+      blockHeader: this.blockHeader.toJSON(),
+      merkleTree: this.merkleTree.toJSON()
+    }
   }
 }

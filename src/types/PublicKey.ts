@@ -2,6 +2,7 @@ import { PrivateKey } from './PrivateKey'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { bytesToHex, hexToBytes, SHA256RIPEMD160 } from '../utils'
 import { Base58Check } from '../base58check'
+import { PublicKeyJSON } from '../types'
 
 export class PublicKey {
   inner: Uint8Array
@@ -50,5 +51,12 @@ export class PublicKey {
 
   static fromHex (hex: string): PublicKey {
     return PublicKey.fromBytes(hexToBytes(hex))
+  }
+
+  toJSON (): PublicKeyJSON {
+    return {
+      inner: bytesToHex(this.inner),
+      compressed: this.compressed
+    }
   }
 }

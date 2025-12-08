@@ -2,6 +2,7 @@ import { Script } from './Script'
 import { bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../utils'
 import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES } from '../constants'
 import { Base58Check } from '../base58check'
+import { OutputJSON } from '../types'
 
 export class Output {
   satoshis: bigint
@@ -81,5 +82,12 @@ export class Output {
     pubKeyHashWithPrefix.set(new Uint8Array(pubKeyHash), 1)
 
     return Base58Check.encode(pubKeyHashWithPrefix)
+  }
+
+  toJSON (): OutputJSON {
+    return {
+      satoshis: String(this.satoshis),
+      script: this.script.ASMString()
+    }
   }
 }

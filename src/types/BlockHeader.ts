@@ -1,14 +1,15 @@
-import {bytesToHex, hexToBytes} from '../utils'
+import { bytesToHex, hexToBytes } from '../utils'
+import { BlockHeaderJSON } from '../types'
 
 export class BlockHeader {
   version: number
-  previousBlockHash: string
-  merkleRoot: string
+  previousBlockHash: Uint8Array
+  merkleRoot: Uint8Array
   time: number
   nBits: number
   nonce: number
 
-  constructor (version: number, previousBlockHash: string, merkleRoot: string, time: number, nBits: number, nonce: number) {
+  constructor (version: number, previousBlockHash: Uint8Array, merkleRoot: Uint8Array, time: number, nBits: number, nonce: number) {
     this.version = version
     this.previousBlockHash = previousBlockHash
     this.merkleRoot = merkleRoot
@@ -29,10 +30,21 @@ export class BlockHeader {
     const nBits = dataView.getUint32(72, true)
     const nonce = dataView.getUint32(76, true)
 
-    return new BlockHeader(version, bytesToHex(previousBlockHash.toReversed()), bytesToHex(merkleRoot.toReversed()), time, nBits, nonce)
+    return new BlockHeader(version, previousBlockHash.toReversed(), merkleRoot.toReversed(), time, nBits, nonce)
   }
 
-  static fromHex(hex: string): BlockHeader {
+  static fromHex (hex: string): BlockHeader {
     return BlockHeader.fromBytes(hexToBytes(hex))
+  }
+
+  toJSON (): BlockHeaderJSON {
+    return {
+      version: this.version,
+      previousBlockHash: bytesToHex(this.previousBlockHash),
+      merkleRoot: bytesToHex(this.merkleRoot),
+      time: this.time,
+      nBits: this.nBits,
+      nonce: this.nonce
+    }
   }
 }
