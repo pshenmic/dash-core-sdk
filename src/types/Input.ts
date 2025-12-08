@@ -1,4 +1,4 @@
-import {Script} from "./script";
+import { Script } from './Script'
 import {
   bytesToHex,
   decodeCompactSize,
@@ -6,18 +6,19 @@ import {
   getCompactVariableSize,
   hexToBytes,
   SHA256RIPEMD160
-} from "../utils";
-import {DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES} from "../constants";
-import {Base58Check} from "../base58check";
+} from '../utils'
+import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES } from '../constants'
+import { Base58Check } from '../base58check'
+import { InputJSON } from '../types'
 
 export class Input {
   txId: Uint8Array
-  vout: number
+  vOut: number
   scriptSig: Script
   sequence: number
 
-  constructor(txId: string | Uint8Array, vout: number, scriptSig: Script, sequence: number) {
-    if (typeof txId === "string") {
+  constructor (txId: string | Uint8Array, vOut: number, scriptSig: Script, sequence: number) {
+    if (typeof txId === 'string') {
       this.txId = hexToBytes(txId)
     } else if (ArrayBuffer.isView(txId)) {
       this.txId = txId
@@ -25,40 +26,40 @@ export class Input {
       this.txId = new Uint8Array(32)
     }
 
-    this.vout = vout
+    this.vOut = vOut
     this.scriptSig = scriptSig
     this.sequence = sequence
   }
 
-  getTxIdHex(): string {
-    return bytesToHex(this.txId.reverse())
+  getTxIdHex (): string {
+    return bytesToHex(this.txId.toReversed())
   }
 
-  bytes(): Uint8Array {
+  bytes (): Uint8Array {
     const txIdBytes = this.txId
-    const voutBytes = new DataView(new ArrayBuffer(4))
+    const vOutBytes = new DataView(new ArrayBuffer(4))
     const scriptSigBytes = this.scriptSig.bytes()
     const scriptSigSizeBytes = encodeCompactSize(scriptSigBytes.byteLength)
     const sequenceBytes = new DataView(new ArrayBuffer(4))
 
-    voutBytes.setUint32(0, this.vout, true)
+    vOutBytes.setUint32(0, this.vOut, true)
     sequenceBytes.setUint32(0, this.sequence, true)
 
-    const bytes = new Uint8Array(txIdBytes.byteLength + voutBytes.byteLength + scriptSigBytes.byteLength + scriptSigSizeBytes.byteLength + sequenceBytes.byteLength)
+    const bytes = new Uint8Array(txIdBytes.byteLength + vOutBytes.byteLength + scriptSigBytes.byteLength + scriptSigSizeBytes.byteLength + sequenceBytes.byteLength)
 
-    bytes.set(txIdBytes, 0)
-    bytes.set(new Uint8Array(voutBytes.buffer), txIdBytes.byteLength)
-    bytes.set(scriptSigSizeBytes, txIdBytes.byteLength + voutBytes.byteLength)
-    bytes.set(scriptSigBytes, txIdBytes.byteLength + voutBytes.byteLength + scriptSigSizeBytes.byteLength)
-    bytes.set(new Uint8Array(sequenceBytes.buffer), txIdBytes.byteLength + voutBytes.byteLength + scriptSigBytes.byteLength + scriptSigSizeBytes.byteLength)
+    bytes.set(txIdBytes.toReversed(), 0)
+    bytes.set(new Uint8Array(vOutBytes.buffer), txIdBytes.byteLength)
+    bytes.set(scriptSigSizeBytes, txIdBytes.byteLength + vOutBytes.byteLength)
+    bytes.set(scriptSigBytes, txIdBytes.byteLength + vOutBytes.byteLength + scriptSigSizeBytes.byteLength)
+    bytes.set(new Uint8Array(sequenceBytes.buffer), txIdBytes.byteLength + vOutBytes.byteLength + scriptSigBytes.byteLength + scriptSigSizeBytes.byteLength)
 
     return bytes
   }
 
-  static fromBytes(bytes: Uint8Array): Input {
+  static fromBytes (bytes: Uint8Array): Input {
     const txIdBytes = bytes.slice(0, 32)
 
-    const voutBytes = new DataView(bytes.slice(32, 36).buffer)
+    const vOutBytes = new DataView(bytes.slice(32, 36).buffer)
 
     const scriptSigSize = decodeCompactSize(36, bytes)
     const scriptBytesSize = getCompactVariableSize(scriptSigSize)
@@ -68,24 +69,24 @@ export class Input {
     const sequenceBytes = new DataView(bytes.slice(36 + scriptBytesSize + Number(scriptSigSize), 36 + scriptBytesSize + Number(scriptSigSize) + 4).buffer)
 
     return new Input(
-      txIdBytes,
-      voutBytes.getUint32(0, true),
+      txIdBytes.toReversed(),
+      vOutBytes.getUint32(0, true),
       Script.fromBytes(scriptSigBytes),
       sequenceBytes.getUint32(0, true)
     )
   }
 
-  hex() {
+  hex (): string {
     return bytesToHex(this.bytes())
   }
 
-  static fromHex(hex: string) {
+  static fromHex (hex: string): Input {
     return Input.fromBytes(hexToBytes(hex))
   }
 
-  getAddress(network: Network = DEFAULT_NETWORK): string | undefined {
+  getAddress (network: Network = DEFAULT_NETWORK): string | undefined {
     if (network > 255) {
-      throw new Error("Network prefix cannot be more than 255")
+      throw new Error('Network prefix cannot be more than 255')
     }
 
     const cryptoOpCodes = [OPCODES.OP_PUSHBYTES_33, OPCODES.OP_PUSHBYTES_65]
@@ -102,7 +103,7 @@ export class Input {
       return undefined
     }
 
-    let pubKeyHash: Uint8Array = SHA256RIPEMD160(new Uint8Array(pubKeyHashChunk.data))
+    const pubKeyHash: Uint8Array = SHA256RIPEMD160(new Uint8Array(pubKeyHashChunk.data))
 
     const pubKeyHashWithPrefix = new Uint8Array(1 + pubKeyHash.byteLength)
 
@@ -112,5 +113,14 @@ export class Input {
     pubKeyHashWithPrefix.set(new Uint8Array(pubKeyHash), 1)
 
     return Base58Check.encode(pubKeyHashWithPrefix)
+  }
+
+  toJSON (): InputJSON {
+    return {
+      txId: bytesToHex(this.txId),
+      vOut: this.vOut,
+      scriptSig: this.scriptSig.ASMString(),
+      sequence: this.sequence
+    }
   }
 }

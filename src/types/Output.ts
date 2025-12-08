@@ -1,18 +1,19 @@
-import {Script} from "./script";
-import {bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes} from "../utils";
-import {DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES} from "../constants";
-import {Base58Check} from "../base58check";
+import { Script } from './Script'
+import { bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../utils'
+import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES } from '../constants'
+import { Base58Check } from '../base58check'
+import { OutputJSON } from '../types'
 
 export class Output {
   satoshis: bigint
   script: Script
 
-  constructor(satoshis: bigint, script: Script) {
+  constructor (satoshis: bigint, script: Script) {
     this.satoshis = satoshis
     this.script = script
   }
 
-  static fromBytes(bytes: Uint8Array): Output {
+  static fromBytes (bytes: Uint8Array): Output {
     const properties = new DataView(bytes.buffer)
 
     const satoshis = properties.getBigUint64(0, true)
@@ -26,11 +27,11 @@ export class Output {
     return new Output(satoshis, script)
   }
 
-  static fromHex(hex: string): Output {
+  static fromHex (hex: string): Output {
     return Output.fromBytes(hexToBytes(hex))
   }
 
-  bytes(): Uint8Array {
+  bytes (): Uint8Array {
     const scriptBytes = this.script.bytes()
     const scriptSize = encodeCompactSize(scriptBytes.byteLength)
 
@@ -42,18 +43,18 @@ export class Output {
 
     bytes.set(new Uint8Array(dataView.buffer), 0)
     bytes.set(scriptSize, dataView.buffer.byteLength)
-    bytes.set(scriptBytes, dataView.byteLength+scriptSize.byteLength)
+    bytes.set(scriptBytes, dataView.byteLength + scriptSize.byteLength)
 
-    return bytes;
+    return bytes
   }
 
-  hex(): string {
+  hex (): string {
     return bytesToHex(this.bytes())
   }
 
-  getAddress(network: Network = DEFAULT_NETWORK): string | undefined {
+  getAddress (network: Network = DEFAULT_NETWORK): string | undefined {
     if (network > 255) {
-      throw new Error("Network prefix cannot be more than 255")
+      throw new Error('Network prefix cannot be more than 255')
     }
 
     // TODO: add other codes
@@ -81,5 +82,12 @@ export class Output {
     pubKeyHashWithPrefix.set(new Uint8Array(pubKeyHash), 1)
 
     return Base58Check.encode(pubKeyHashWithPrefix)
+  }
+
+  toJSON (): OutputJSON {
+    return {
+      satoshis: String(this.satoshis),
+      script: this.script.ASMString()
+    }
   }
 }

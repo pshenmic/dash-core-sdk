@@ -1,12 +1,12 @@
-import {OPCODES, OPCODES_ENUM} from "../constants";
-import {bytesToHex, hexToBytes} from "../utils";
-import {ScriptChunk} from "../types";
+import { OPCODES, OPCODES_ENUM } from '../constants'
+import { bytesToHex, hexToBytes } from '../utils'
+import { ScriptChunk } from '../types'
 
 export class Script {
   #parsedScript: ScriptChunk[]
 
-  constructor(script?: Script | Uint8Array | string | ScriptChunk[]) {
-    if (!script) {
+  constructor (script?: Script | Uint8Array | string | ScriptChunk[]) {
+    if (script == null) {
       this.#parsedScript = []
       return this
     }
@@ -21,9 +21,9 @@ export class Script {
     }
 
     if (typeof script === 'string') {
-      if(/^[0-9A-Fa-f]+$/.test(script)) {
+      if (/^[0-9A-Fa-f]+$/.test(script)) {
         return Script.fromHex(script)
-      }else{
+      } else {
         return Script.fromASM(script)
       }
     }
@@ -34,28 +34,27 @@ export class Script {
     }
   }
 
-  get parsedScriptChunks(): ScriptChunk[] {
+  get parsedScriptChunks (): ScriptChunk[] {
     return this.#parsedScript
   }
 
-  set parsedScriptChunks(chunks: ScriptChunk[]) {
+  set parsedScriptChunks (chunks: ScriptChunk[]) {
     this.#parsedScript = chunks
   }
 
-  addData(opCode: OPCODES_ENUM, data?: Uint8Array) {
+  addData (opCode: OPCODES_ENUM, data?: Uint8Array): void {
     this.#parsedScript.push({
       opcode: OPCODES[opCode],
-      data: data?.buffer as ArrayBuffer,
+      data: data?.buffer as ArrayBuffer
     })
   }
 
-  static fromBytes(bytes: Uint8Array): Script {
-
+  static fromBytes (bytes: Uint8Array): Script {
     // OP_DUP OP_HASH160 OP_PUSHBYTES_20 a3890b802865e1cfeed7653d0fea33831d709b6f OP_EQUALVERIFY OP_CHECKSIG
 
-    //76a914a3890b802865e1cfeed7653d0fea33831d709b6f88ac
-    //stack operator  cryptography  push_data                 data                         Bitwise Logic    cryptography
-    //76                a9              14       a3890b802865e1cfeed7653d0fea33831d709b6f      88              ac
+    // 76a914a3890b802865e1cfeed7653d0fea33831d709b6f88ac
+    // stack operator  cryptography  push_data                 data                         Bitwise Logic    cryptography
+    // 76                a9              14       a3890b802865e1cfeed7653d0fea33831d709b6f      88              ac
 
     const chunks: ScriptChunk[] = []
 
@@ -64,8 +63,8 @@ export class Script {
     for (let i = 0; i < bytes.length; i++) {
       const opcode = dataView.getUint8(i)
 
-      let chunk: ScriptChunk = {
-        opcode: opcode,
+      const chunk: ScriptChunk = {
+        opcode
       }
 
       if (opcode < OPCODES.OP_PUSHDATA1 && opcode > 0) {
@@ -97,11 +96,11 @@ export class Script {
     return new Script(chunks)
   }
 
-  static fromHex(hex: string): Script {
+  static fromHex (hex: string): Script {
     return this.fromBytes(hexToBytes(hex))
   }
 
-  static fromASM(asm: string): Script {
+  static fromASM (asm: string): Script {
     const scriptChunks: ScriptChunk[] = []
 
     const chunks: string[] = asm.split(' ')
@@ -110,19 +109,19 @@ export class Script {
       const opcode = OPCODES[chunks[i]]
 
       if (opcode === undefined) {
-        throw new Error("Cannot parse asm string")
+        throw new Error('Cannot parse asm string')
       }
 
       if (opcode > 0 && opcode <= OPCODES.OP_PUSHDATA4) {
         scriptChunks.push({
-          opcode: opcode,
+          opcode,
           data: hexToBytes(chunks[i + 1]).buffer as ArrayBuffer
         })
 
         i++
       } else {
         scriptChunks.push({
-          opcode: opcode,
+          opcode
         })
       }
     }
@@ -130,32 +129,32 @@ export class Script {
     return new Script(scriptChunks)
   }
 
-  ASMString(): string {
+  ASMString (): string {
     const out: string[] = []
 
     for (let i = 0; i < this.#parsedScript.length; i++) {
       const chunk = this.#parsedScript[i]
 
-      const opcode_human_readable = Object.keys(OPCODES)[Object.values(OPCODES).indexOf(chunk.opcode)];
-      const data_human_readable = chunk.data ? bytesToHex(new Uint8Array(chunk.data)) : undefined
+      const opcodeHumanReadable = Object.keys(OPCODES)[Object.values(OPCODES).indexOf(chunk.opcode)]
+      const dataHumanReadable = (chunk.data != null) ? bytesToHex(new Uint8Array(chunk.data)) : undefined
 
-      out.push(opcode_human_readable)
+      out.push(opcodeHumanReadable)
 
-      if (data_human_readable) {
-        out.push(data_human_readable)
+      if (dataHumanReadable != null) {
+        out.push(dataHumanReadable)
       }
     }
 
     return out.join(' ')
   }
 
-  bytes(): Uint8Array<ArrayBufferLike> {
-    let out: Uint8Array = new Uint8Array<ArrayBuffer>(new ArrayBuffer(0));
+  bytes (): Uint8Array<ArrayBufferLike> {
+    let out: Uint8Array = new Uint8Array<ArrayBuffer>(new ArrayBuffer(0))
 
     for (let i = 0; i < this.#parsedScript.length; i++) {
       const chunk = this.#parsedScript[i]
 
-      const {data} = chunk
+      const { data } = chunk
 
       const dataLength = data?.byteLength ?? 0
 
@@ -165,7 +164,7 @@ export class Script {
 
       tmpBytes.set([chunk.opcode], out.byteLength)
 
-      if (chunk.data) {
+      if (chunk.data != null) {
         tmpBytes.set(new Uint8Array(chunk.data), out.byteLength + 1)
       }
 
@@ -175,7 +174,7 @@ export class Script {
     return out
   }
 
-  hex(): string {
+  hex (): string {
     const bytes = this.bytes()
 
     return bytesToHex(bytes)

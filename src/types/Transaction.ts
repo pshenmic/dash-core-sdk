@@ -1,8 +1,21 @@
-import {DEFAULT_NLOCK_TIME, NLOCK_TIME_BLOCK_BASED_LIMIT, TRANSACTION_VERSION, TransactionType} from "../constants";
-import {TransactionJSON} from "../types";
-import {Input} from "./Input";
-import {Output} from "./Output";
-import {bytesToHex, decodeCompactSize, doubleSHA256, encodeCompactSize, getCompactVariableSize} from "../utils";
+import {
+  DEFAULT_NLOCK_TIME,
+  ExtraPayloadType,
+  NLOCK_TIME_BLOCK_BASED_LIMIT,
+  TRANSACTION_VERSION,
+  TransactionType
+} from '../constants'
+import { TransactionJSON } from '../types'
+import { Input } from './Input'
+import { Output } from './Output'
+import {
+  bytesToHex,
+  decodeCompactSize,
+  doubleSHA256,
+  encodeCompactSize,
+  getCompactVariableSize,
+  hexToBytes
+} from '../utils'
 
 export class Transaction {
   version: number
@@ -10,26 +23,28 @@ export class Transaction {
   #nLockTime: number
   inputs: Input[]
   outputs: Output[]
+  extraPayload?: Uint8Array
 
-  //TODO: payload
+  // TODO: payload
 
-  constructor(inputs: Input[], outputs: Output[], nLockTime: number, version: number, type: TransactionType) {
+  constructor (inputs: Input[], outputs: Output[], nLockTime: number, version: number, type: TransactionType, extraPayload?: Uint8Array) {
     this.version = version ?? TRANSACTION_VERSION
     this.type = type ?? TransactionType.TRANSACTION_NORMAL
     this.#nLockTime = nLockTime ?? DEFAULT_NLOCK_TIME
     this.inputs = inputs
     this.outputs = outputs
+    this.extraPayload = extraPayload
   }
 
-  get nLockTime(): Date | number {
+  get nLockTime (): Date | number {
     if (this.#nLockTime < NLOCK_TIME_BLOCK_BASED_LIMIT) {
       return this.#nLockTime
     } else {
-      return this.#nLockTime ? new Date(this.#nLockTime) : this.#nLockTime
+      return !isNaN(this.#nLockTime) ? new Date(this.#nLockTime) : this.#nLockTime
     }
   }
 
-  set nLockTime(nLockTime: number | Date) {
+  set nLockTime (nLockTime: number | Date) {
     if (nLockTime instanceof Date) {
       this.#nLockTime = nLockTime.getTime()
       return
@@ -41,20 +56,45 @@ export class Transaction {
     }
 
     if (nLockTime < 0) {
-      throw new Error(`nLockTime must be greater than 0`)
+      throw new Error('nLockTime must be greater than 0')
     }
 
     this.#nLockTime = nLockTime
   }
 
-  getOutputAmount(): bigint {
+  getOutputAmount (): bigint {
     return this.outputs.reduce((acc, curr) => {
       return acc + curr.satoshis
     }, BigInt(0))
   }
 
-  hash(): string {
-    return bytesToHex(doubleSHA256(this.bytes()).reverse())
+  id (): string {
+    return bytesToHex(doubleSHA256(this.bytes()).toReversed())
+  }
+
+  getExtraPayloadType (): keyof typeof ExtraPayloadType | undefined {
+    switch (this.type) {
+      case TransactionType.TRANSACTION_PROVIDER_REGISTER:
+        return 'ProRegTx'
+      case TransactionType.TRANSACTION_PROVIDER_UPDATE_SERVICE:
+        return 'ProUpServTx'
+      case TransactionType.TRANSACTION_PROVIDER_UPDATE_REGISTRAR:
+        return 'ProUpRegTx'
+      case TransactionType.TRANSACTION_PROVIDER_UPDATE_REVOKE:
+        return 'ProUpRevTx'
+      case TransactionType.TRANSACTION_COINBASE:
+        return 'CbTx'
+      case TransactionType.TRANSACTION_QUORUM_COMMITMENT:
+        return 'QcTx'
+      case TransactionType.TRANSACTION_MASTERNODE_HARD_FORK_SIGNAL:
+        return 'MnHfTx'
+      case TransactionType.TRANSACTION_ASSET_LOCK:
+        return 'AssetLockTx'
+      case TransactionType.TRANSACTION_ASSET_UNLOCK:
+        return 'AssetUnlockTx'
+    }
+
+    return undefined
   }
 
   // sign(privateKey: Uint8Array): Uint8Array {
@@ -65,68 +105,7 @@ export class Transaction {
   //   return tx.toBytes(true)
   // }
 
-  toJSON(): TransactionJSON {
-    return {
-      version: this.version,
-      type: this.type,
-      nLockTime: this.#nLockTime,
-    }
-  }
-
-  static fromBytes(bytes: Uint8Array): Transaction {
-    // 4 bytes version & type packed
-    // varint input count
-    // inputs
-    // varint output count
-    // outputs
-    // nLockTime
-
-    const dataView = new DataView(bytes.buffer)
-
-    const versionWithType = dataView.getInt32(0, true)
-    const version = versionWithType & 0xffff
-    const type = (versionWithType >> 16) & 0xffff
-
-    const inputCount = decodeCompactSize(4, bytes)
-    const inputCountSize = getCompactVariableSize(inputCount)
-
-    const inputsPadding = 4 + inputCountSize
-
-    const inputs: Input[] = []
-
-    for (let i = BigInt(0); i < inputCount; i++) {
-      const offset = inputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
-
-      const input = Input.fromBytes(bytes.slice(inputsPadding + offset))
-
-      inputs.push(input)
-    }
-
-    const outputCountPadding = inputs.reduce((acc, curr) => acc + curr.bytes().byteLength, inputsPadding)
-
-    const outputCount = decodeCompactSize(outputCountPadding, bytes)
-    const outputCountSize = getCompactVariableSize(outputCount)
-
-    const outputsPadding = outputCountPadding + outputCountSize
-
-    const outputs: Output[] = []
-
-    for (let i = BigInt(0); i < outputCount; i++) {
-      const offset = outputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
-
-      const output = Output.fromBytes(bytes.slice(outputsPadding + offset))
-
-      outputs.push(output)
-    }
-
-    const lockTimePadding = outputCountPadding + outputCountSize + outputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
-
-    const nLockTime = dataView.getUint32(lockTimePadding, true)
-
-    return new Transaction(inputs, outputs, nLockTime, version, type)
-  }
-
-  bytes(): Uint8Array {
+  bytes (): Uint8Array {
     // 4 bytes version & type packed
     // varint input count
     // inputs
@@ -183,5 +162,85 @@ export class Transaction {
     out.set(new Uint8Array(lockTimeView.buffer), 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize)
 
     return out
+  }
+
+  hex (): string {
+    return bytesToHex(this.bytes())
+  }
+
+  static fromBytes (bytes: Uint8Array): Transaction {
+    // 4 bytes version & type packed
+    // varint input count
+    // inputs
+    // varint output count
+    // outputs
+    // nLockTime
+
+    const dataView = new DataView(bytes.buffer)
+
+    const versionWithType = dataView.getInt32(0, true)
+    const version = versionWithType & 0xffff
+    const type = (versionWithType >> 16) & 0xffff
+
+    const inputCount = decodeCompactSize(4, bytes)
+    const inputCountSize = getCompactVariableSize(inputCount)
+
+    const inputsPadding = 4 + inputCountSize
+
+    const inputs: Input[] = []
+
+    for (let i = BigInt(0); i < inputCount; i++) {
+      const offset = inputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
+
+      const input = Input.fromBytes(bytes.slice(inputsPadding + offset))
+
+      inputs.push(input)
+    }
+
+    const outputCountPadding = inputs.reduce((acc, curr) => acc + curr.bytes().byteLength, inputsPadding)
+
+    const outputCount = decodeCompactSize(outputCountPadding, bytes)
+    const outputCountSize = getCompactVariableSize(outputCount)
+
+    const outputsPadding = outputCountPadding + outputCountSize
+
+    const outputs: Output[] = []
+
+    for (let i = BigInt(0); i < outputCount; i++) {
+      const offset = outputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
+
+      const output = Output.fromBytes(bytes.slice(outputsPadding + offset))
+
+      outputs.push(output)
+    }
+
+    const lockTimePadding = outputCountPadding + outputCountSize + outputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0)
+
+    const nLockTime = dataView.getUint32(lockTimePadding, true)
+
+    let extraPayload: Uint8Array | undefined
+
+    if (lockTimePadding + 4 < bytes.length) {
+      const extraPayloadSize = decodeCompactSize(lockTimePadding + 4, bytes)
+
+      extraPayload = bytes.slice(lockTimePadding + 4, lockTimePadding + 4 + Number(extraPayloadSize))
+    }
+
+    return new Transaction(inputs, outputs, nLockTime, version, type, extraPayload)
+  }
+
+  static fromHex (hex: string): Transaction {
+    return Transaction.fromBytes(hexToBytes(hex))
+  }
+
+  toJSON (): TransactionJSON {
+    return {
+      version: this.version,
+      type: this.type,
+      nLockTime: this.#nLockTime,
+      outputs: this.outputs.map(output => output.toJSON()),
+      inputs: this.inputs.map(input => input.toJSON()),
+      extraPayload: this.extraPayload != null ? bytesToHex(this.extraPayload) : null
+    }
   }
 }
