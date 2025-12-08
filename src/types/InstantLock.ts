@@ -34,8 +34,8 @@ export class InstantLock {
     out.set(new Uint8Array([this.version]), 0)
     out.set(inputSizeBytes, 1)
     out.set(inputsBytes, 1 + inputSizeBytes.byteLength)
-    out.set(this.txId, 1 + inputSizeBytes.byteLength + inputsBytes.byteLength)
-    out.set(this.cycleHash, 1 + inputSizeBytes.byteLength + inputsBytes.byteLength + this.txId.byteLength)
+    out.set(this.txId.toReversed(), 1 + inputSizeBytes.byteLength + inputsBytes.byteLength)
+    out.set(this.cycleHash.toReversed(), 1 + inputSizeBytes.byteLength + inputsBytes.byteLength + this.txId.byteLength)
     out.set(this.signature, 1 + inputSizeBytes.byteLength + inputsBytes.byteLength + this.txId.byteLength + this.cycleHash.byteLength)
 
     return out
@@ -65,7 +65,7 @@ export class InstantLock {
       inputs.push(OutPoint.fromBytes(inputsBytes.slice(i * 36, (i + 1) * 36)))
     }
 
-    return new InstantLock(version, inputs, txId, cycleHash, sig)
+    return new InstantLock(version, inputs, txId.toReversed(), cycleHash.toReversed(), sig)
   }
 
   static fromHex (hex: string): InstantLock {
@@ -78,8 +78,8 @@ export class InstantLock {
     return {
       version: this.version,
       inputs: inputsJSON,
-      txId: bytesToHex(this.txId.toReversed()),
-      cycleHash: bytesToHex(this.cycleHash.toReversed()),
+      txId: bytesToHex(this.txId),
+      cycleHash: bytesToHex(this.cycleHash),
       signature: bytesToHex(this.signature)
     }
   }
