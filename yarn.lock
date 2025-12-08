@@ -125,6 +125,11 @@
     "@typescript/vfs" "^1.5.2"
     typescript "5.4.5"
 
+"@dashevo/x11-hash-js@^1.0.2":
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/@dashevo/x11-hash-js/-/x11-hash-js-1.0.2.tgz#a9d7ef55d57654f7eae04825cf232f7fd20acdd6"
+  integrity sha512-3vvnZweBca4URBXHF+FTrM4sdTpp3IMt73G1zUKQEdYm/kJkIKN94qpFai7YZDl87k64RCH+ckRZk6ruQPz5KQ==
+
 "@esbuild/aix-ppc64@0.25.10":
   version "0.25.10"
   resolved "https://registry.yarnpkg.com/@esbuild/aix-ppc64/-/aix-ppc64-0.25.10.tgz#ee6b7163a13528e099ecf562b972f2bcebe0aa97"

@@ -30,6 +30,7 @@
     "tsx": "^4.20.5"
   },
   "dependencies": {
+    "@dashevo/x11-hash-js": "^1.0.2",
     "@noble/curves": "^2.0.1",
     "@protobuf-ts/grpcweb-transport": "^2.11.1",
     "@scure/base": "^2.0.0",
