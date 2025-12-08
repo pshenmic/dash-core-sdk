@@ -68,7 +68,7 @@ export class Transaction {
     }, BigInt(0))
   }
 
-  id (): string {
+  hash (): string {
     return bytesToHex(doubleSHA256(this.bytes()).toReversed())
   }
 
