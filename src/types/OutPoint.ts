@@ -15,7 +15,7 @@ export class OutPoint {
     const vOutView = new DataView(new ArrayBuffer(4))
     vOutView.setUint32(0, this.vOut, true)
 
-    out.set(this.txId, 0)
+    out.set(this.txId.toReversed(), 0)
     out.set(new Uint8Array(vOutView.buffer), this.txId.length)
 
     return out
@@ -31,7 +31,7 @@ export class OutPoint {
     const txId = bytes.slice(0, 32)
     const vOut = dataView.getUint32(32, true)
 
-    return new OutPoint(txId, vOut)
+    return new OutPoint(txId.toReversed(), vOut)
   }
 
   static fromHex (hex: string): OutPoint {
