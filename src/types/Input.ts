@@ -46,7 +46,7 @@ export class Input {
 
     const bytes = new Uint8Array(txIdBytes.byteLength + voutBytes.byteLength + scriptSigBytes.byteLength + scriptSigSizeBytes.byteLength + sequenceBytes.byteLength)
 
-    bytes.set(txIdBytes, 0)
+    bytes.set(txIdBytes.toReversed(), 0)
     bytes.set(new Uint8Array(voutBytes.buffer), txIdBytes.byteLength)
     bytes.set(scriptSigSizeBytes, txIdBytes.byteLength + voutBytes.byteLength)
     bytes.set(scriptSigBytes, txIdBytes.byteLength + voutBytes.byteLength + scriptSigSizeBytes.byteLength)
@@ -68,7 +68,7 @@ export class Input {
     const sequenceBytes = new DataView(bytes.slice(36 + scriptBytesSize + Number(scriptSigSize), 36 + scriptBytesSize + Number(scriptSigSize) + 4).buffer)
 
     return new Input(
-      txIdBytes,
+      txIdBytes.toReversed(),
       voutBytes.getUint32(0, true),
       Script.fromBytes(scriptSigBytes),
       sequenceBytes.getUint32(0, true)

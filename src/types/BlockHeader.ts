@@ -1,4 +1,4 @@
-import { bytesToHex } from '../utils'
+import {bytesToHex, hexToBytes} from '../utils'
 
 export class BlockHeader {
   version: number
@@ -29,6 +29,10 @@ export class BlockHeader {
     const nBits = dataView.getUint32(72, true)
     const nonce = dataView.getUint32(76, true)
 
-    return new BlockHeader(version, bytesToHex(previousBlockHash), bytesToHex(merkleRoot), time, nBits, nonce)
+    return new BlockHeader(version, bytesToHex(previousBlockHash.toReversed()), bytesToHex(merkleRoot.toReversed()), time, nBits, nonce)
+  }
+
+  static fromHex(hex: string): BlockHeader {
+    return BlockHeader.fromBytes(hexToBytes(hex))
   }
 }
