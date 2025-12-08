@@ -43,7 +43,7 @@ export const DEFAULT_NLOCK_TIME = 0
 export const NLOCK_TIME_BLOCK_BASED_LIMIT = 5e8
 
 export const OPCODES = {
-  OP_0 : 0,
+  OP_0: 0,
   OP_PUSHBYTES_1: 1,
   OP_PUSHBYTES_2: 2,
   OP_PUSHBYTES_3: 3,
@@ -358,9 +358,21 @@ export const WIFNetworkPrefix = {
 }
 
 export const MAX_BLOCK_WEIGHT = 4000000
-export const MIN_TRANSACTION_WEIGHT = 4*60
+export const MIN_TRANSACTION_WEIGHT = 4 * 60
 
 export const MAX_BLOOM_FILTER_SIZE = 36000
 export const MAX_BLOOM_FILTER_FUNC_COUNT = 50
 export const BLOOM_FILTER_FBA_CONSTANT = 0xfba4c795
 export const BLOOM_FILTER_FALSE_POSITIVE_RATE = 0.0001
+
+export const enum ExtraPayloadType {
+  "ProRegTx" = 0,
+  "ProUpServTx" = 1,
+  "ProUpRegTx" = 2,
+  "ProUpRevTx" = 3,
+  "CbTx" = 4,
+  "QcTx" = 5,
+  "MnHfTx" = 6,
+  "AssetLockTx" = 7,
+  "AssetUnlockTx" = 8
+}

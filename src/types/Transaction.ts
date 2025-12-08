@@ -1,4 +1,10 @@
-import { DEFAULT_NLOCK_TIME, NLOCK_TIME_BLOCK_BASED_LIMIT, TRANSACTION_VERSION, TransactionType } from '../constants'
+import {
+  DEFAULT_NLOCK_TIME,
+  ExtraPayloadType,
+  NLOCK_TIME_BLOCK_BASED_LIMIT,
+  TRANSACTION_VERSION,
+  TransactionType
+} from '../constants'
 import { TransactionJSON } from '../types'
 import { Input } from './Input'
 import { Output } from './Output'
@@ -17,15 +23,17 @@ export class Transaction {
   #nLockTime: number
   inputs: Input[]
   outputs: Output[]
+  extraPayload?: Uint8Array
 
   // TODO: payload
 
-  constructor (inputs: Input[], outputs: Output[], nLockTime: number, version: number, type: TransactionType) {
+  constructor (inputs: Input[], outputs: Output[], nLockTime: number, version: number, type: TransactionType, extraPayload?: Uint8Array) {
     this.version = version ?? TRANSACTION_VERSION
     this.type = type ?? TransactionType.TRANSACTION_NORMAL
     this.#nLockTime = nLockTime ?? DEFAULT_NLOCK_TIME
     this.inputs = inputs
     this.outputs = outputs
+    this.extraPayload = extraPayload
   }
 
   get nLockTime (): Date | number {
@@ -64,6 +72,31 @@ export class Transaction {
     return bytesToHex(doubleSHA256(this.bytes()).toReversed())
   }
 
+  getExtraPayloadType (): keyof typeof ExtraPayloadType | undefined {
+    switch (this.type) {
+      case TransactionType.TRANSACTION_PROVIDER_REGISTER:
+        return 'ProRegTx'
+      case TransactionType.TRANSACTION_PROVIDER_UPDATE_SERVICE:
+        return 'ProUpServTx'
+      case TransactionType.TRANSACTION_PROVIDER_UPDATE_REGISTRAR:
+        return 'ProUpRegTx'
+      case TransactionType.TRANSACTION_PROVIDER_UPDATE_REVOKE:
+        return 'ProUpRevTx'
+      case TransactionType.TRANSACTION_COINBASE:
+        return 'CbTx'
+      case TransactionType.TRANSACTION_QUORUM_COMMITMENT:
+        return 'QcTx'
+      case TransactionType.TRANSACTION_MASTERNODE_HARD_FORK_SIGNAL:
+        return 'MnHfTx'
+      case TransactionType.TRANSACTION_ASSET_LOCK:
+        return 'AssetLockTx'
+      case TransactionType.TRANSACTION_ASSET_UNLOCK:
+        return 'AssetUnlockTx'
+    }
+
+    return undefined
+  }
+
   // sign(privateKey: Uint8Array): Uint8Array {
   //   const tx = signer.Transaction.fromRaw(this.bytes())
   //
@@ -76,7 +109,10 @@ export class Transaction {
     return {
       version: this.version,
       type: this.type,
-      nLockTime: this.#nLockTime
+      nLockTime: this.#nLockTime,
+      outputs: this.outputs.map(output => output.hex()),
+      inputs: this.inputs.map(input => input.hex()),
+      extraPayload: this.extraPayload != null ? bytesToHex(this.extraPayload) : null
     }
   }
 
@@ -193,7 +229,15 @@ export class Transaction {
 
     const nLockTime = dataView.getUint32(lockTimePadding, true)
 
-    return new Transaction(inputs, outputs, nLockTime, version, type)
+    let extraPayload: Uint8Array | undefined
+
+    if (lockTimePadding + 4 < bytes.length) {
+      const extraPayloadSize = decodeCompactSize(lockTimePadding + 4, bytes)
+
+      extraPayload = bytes.slice(lockTimePadding + 4, lockTimePadding + 4 + Number(extraPayloadSize))
+    }
+
+    return new Transaction(inputs, outputs, nLockTime, version, type, extraPayload)
   }
 
   static fromHex (hex: string): Transaction {
