@@ -1,6 +1,7 @@
-import { OPCODES, OPCODES_ENUM } from '../constants'
-import { bytesToHex, hexToBytes } from '../utils'
+import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES, OPCODES_ENUM } from '../constants'
+import { bytesToHex, hexToBytes, SHA256RIPEMD160 } from '../utils'
 import { ScriptChunk } from '../types'
+import { Base58Check } from '../base58check'
 
 export class Script {
   #parsedScript: ScriptChunk[]
@@ -47,6 +48,37 @@ export class Script {
       opcode: OPCODES[opCode],
       data: data?.buffer as ArrayBuffer
     })
+  }
+
+  toAddress (network: Network = DEFAULT_NETWORK): string | undefined {
+    if (network > 255) {
+      throw new Error('Network prefix cannot be more than 255')
+    }
+
+    const cryptoOpCodes = [OPCODES.OP_PUSHBYTES_33, OPCODES.OP_PUSHBYTES_65]
+
+    const cryptoOpcodeIndex = this.parsedScriptChunks.findIndex(chunk => cryptoOpCodes.includes(chunk.opcode))
+
+    if (cryptoOpcodeIndex === -1) {
+      return undefined
+    }
+
+    const pubKeyHashChunk = this.parsedScriptChunks[cryptoOpcodeIndex]
+
+    if (pubKeyHashChunk === undefined || pubKeyHashChunk?.data === undefined) {
+      return undefined
+    }
+
+    const pubKeyHash: Uint8Array = SHA256RIPEMD160(new Uint8Array(pubKeyHashChunk.data))
+
+    const pubKeyHashWithPrefix = new Uint8Array(1 + pubKeyHash.byteLength)
+
+    const prefix = (network ?? DEFAULT_NETWORK) === Network.Testnet ? NetworkPrefix.PubkeyPrefixTestnet : NetworkPrefix.PubkeyPrefixMainnet
+
+    pubKeyHashWithPrefix.set(new Uint8Array([prefix]), 0)
+    pubKeyHashWithPrefix.set(new Uint8Array(pubKeyHash), 1)
+
+    return Base58Check.encode(pubKeyHashWithPrefix)
   }
 
   static fromBytes (bytes: Uint8Array): Script {
