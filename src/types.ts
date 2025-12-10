@@ -1,65 +1,65 @@
-import {TransactionType} from "./constants.js";
+import { TransactionType } from './constants.js'
 
-export type TransactionJSON = {
+export interface TransactionJSON {
   version: number
   type: TransactionType
-  nLockTime: number,
-  inputs: InputJSON[],
-  outputs: OutputJSON[],
+  nLockTime: number
+  inputs: InputJSON[]
+  outputs: OutputJSON[]
   extraPayload: string | null
 }
 
-export type OutPointJSON = {
-  txId: string,
+export interface OutPointJSON {
+  txId: string
   vOut: number
 }
 
-export type InstantLockJSON = {
+export interface InstantLockJSON {
   version: number
-  inputs: OutPointJSON[],
-  txId: string,
-  cycleHash: string,
+  inputs: OutPointJSON[]
+  txId: string
+  cycleHash: string
   signature: string
 }
 
-export type BlockHeaderJSON = {
-  version: number,
-  previousBlockHash: string,
-  merkleRoot: string,
-  time: number,
-  nBits: number,
-  nonce: number,
+export interface BlockHeaderJSON {
+  version: number
+  previousBlockHash: string
+  merkleRoot: string
+  time: number
+  nBits: number
+  nonce: number
 }
 
-export type InputJSON = {
-  txId: string,
+export interface InputJSON {
+  txId: string
   vOut: number
-  scriptSig: string,
-  sequence: number,
+  scriptSig: string
+  sequence: number
 }
 
-export type MerkleTreeJSON = {
-  transactionCount: number,
-  hashes: string[],
-  flags: boolean[],
+export interface MerkleTreeJSON {
+  transactionCount: number
+  hashes: string[]
+  flags: boolean[]
 }
 
-export type MerkleBlockJSON = {
-  blockHeader: BlockHeaderJSON,
-  merkleTree: MerkleTreeJSON,
+export interface MerkleBlockJSON {
+  blockHeader: BlockHeaderJSON
+  merkleTree: MerkleTreeJSON
 }
 
-export type OutputJSON = {
-  satoshis: string,
-  script: string,
+export interface OutputJSON {
+  satoshis: string
+  script: string
 }
 
-export type PublicKeyJSON = {
-  inner: string,
+export interface PublicKeyJSON {
+  inner: string
   compressed: boolean
 }
 
-export type ScriptChunk = {
-  opcode: number,
+export interface ScriptChunk {
+  opcode: number
   data?: ArrayBuffer
 }

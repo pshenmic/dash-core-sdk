@@ -1,4 +1,4 @@
-import {Script} from "./Script.js";
+import { Script } from './Script.js'
 import {
   bytesToHex,
   decodeCompactSize,

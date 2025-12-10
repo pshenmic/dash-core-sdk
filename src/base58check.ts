@@ -1,31 +1,32 @@
-import {base58} from '@scure/base'
-import {bytesToHex, doubleSHA256} from "./utils.js";
+import { base58 } from '@scure/base'
+import { bytesToHex, doubleSHA256 } from './utils.js'
 
-export class Base58Check {
-  static encode(data: Uint8Array) {
+const Base58Check = {
+  encode: (data: Uint8Array): string => {
     const checksumHash = doubleSHA256(data)
 
-    const out = new Uint8Array(data.byteLength+4)
+    const out = new Uint8Array(data.byteLength + 4)
 
-    out.set(data,0)
-    out.set(checksumHash.slice(0,4), data.byteLength)
+    out.set(data, 0)
+    out.set(checksumHash.slice(0, 4), data.byteLength)
 
     return base58.encode(out)
-  }
-
-  static decode(data: string, skipVerify?: boolean) {
+  },
+  decode: (data: string, skipVerify?: boolean) => {
     const bytes = base58.decode(data)
-    const body = bytes.slice(0,-4)
+    const body = bytes.slice(0, -4)
 
-    if(!skipVerify) {
+    if (skipVerify != null && skipVerify) {
       const passedChecksum = bytes.slice(-4)
-      const correctedChecksum = doubleSHA256(body).slice(0,4)
+      const correctedChecksum = doubleSHA256(body).slice(0, 4)
 
-      if(bytesToHex(passedChecksum) !== bytesToHex(correctedChecksum)) {
-        throw new Error("Base58check decode failed: incorrect checksum provided")
+      if (bytesToHex(passedChecksum) !== bytesToHex(correctedChecksum)) {
+        throw new Error('Base58check decode failed: incorrect checksum provided')
       }
     }
 
     return body
   }
 }
+
+export { Base58Check }
