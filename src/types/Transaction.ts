@@ -4,10 +4,10 @@ import {
   NLOCK_TIME_BLOCK_BASED_LIMIT,
   TRANSACTION_VERSION,
   TransactionType
-} from '../constants'
-import { TransactionJSON } from '../types'
-import { Input } from './Input'
-import { Output } from './Output'
+} from '../constants.js'
+import { TransactionJSON } from '../types.js'
+import { Input } from './Input.js'
+import { Output } from './Output.js'
 import {
   bytesToHex,
   decodeCompactSize,
@@ -15,7 +15,7 @@ import {
   encodeCompactSize,
   getCompactVariableSize,
   hexToBytes
-} from '../utils'
+} from '../utils.js'
 
 export class Transaction {
   version: number

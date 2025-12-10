@@ -1,23 +1,32 @@
 import GRPCConnectionPool from "./grpcConnectionPool.js";
 import {
-    BlockHeadersWithChainLocksResponse, BroadcastTransactionRequest,
-    BroadcastTransactionResponse, GetBestBlockHeightRequest, GetBestBlockHeightResponse,
+    BlockHeadersWithChainLocksResponse,
+    BroadcastTransactionRequest,
+    BroadcastTransactionResponse,
+    GetBestBlockHeightRequest,
+    GetBestBlockHeightResponse,
     GetBlockchainStatusRequest,
-    GetBlockchainStatusResponse, GetBlockRequest, GetBlockResponse,
-    GetEstimatedTransactionFeeRequest, GetEstimatedTransactionFeeResponse, GetMasternodeStatusRequest,
-    GetMasternodeStatusResponse, GetTransactionRequest, MasternodeListRequest,
+    GetBlockchainStatusResponse,
+    GetBlockRequest,
+    GetBlockResponse,
+    GetEstimatedTransactionFeeRequest,
+    GetEstimatedTransactionFeeResponse,
+    GetMasternodeStatusRequest,
+    GetMasternodeStatusResponse,
+    GetTransactionRequest,
+    MasternodeListRequest,
     TransactionsWithProofsRequest
 } from "../proto/generated/core.js";
 import {base58} from "@scure/base";
-import InstantLock from '@dashevo/dashcore-lib/lib/instantlock/instantlock.js'
-import Transaction from '@dashevo/dashcore-lib/lib/transaction/transaction.js'
-import MerkleBlock from '@dashevo/dashcore-lib/lib/block/merkleblock.js'
 import bloomFilter from 'bloom-filter'
-import {BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS} from "./constants.js";
-import bytesToHex, { wait} from "./utils.js";
-import PrivateKey from "@dashevo/dashcore-lib/lib/privatekey.js";
-import { p2pkh } from '@scure/btc-signer'
+import {BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, Network} from "./constants.js";
+import {bytesToHex, hexToBytes, wait} from "./utils.js";
+import {p2pkh} from '@scure/btc-signer'
 import * as secp from '@noble/secp256k1';
+import {PrivateKey} from "./types/PrivateKey.js";
+import {Transaction} from "./types/Transaction.js";
+import {MerkleBlock} from "./types/MerkleBlock.js";
+import {InstantLock} from "./types/InstantLock.js";
 
 interface DapiTransaction {
     transaction: Uint8Array;
@@ -66,7 +75,7 @@ export class DashCoreSDK {
         const P2PKH = p2pkh(publicKey, DASH_VERSIONS['testnet'])
 
         return {
-            wif: PrivateKey.fromBuffer(Buffer.from(secretKey), 'testnet').toWIF(),
+            wif: PrivateKey.fromBytes(secretKey, Network.Testnet).toWIF(),
             address: P2PKH.address
         }
     }
@@ -157,15 +166,15 @@ export class DashCoreSDK {
                     await wait(5000)
 
                     for (const pendingTransaction of pendingTransactions) {
-                        const dapiTransaction = await this.getTransaction(pendingTransaction.hash)
-                        const transaction = new Transaction(bytesToHex(dapiTransaction.transaction))
+                        const dapiTransaction = await this.getTransaction(pendingTransaction.hash())
+                        const transaction = Transaction.fromBytes(dapiTransaction.transaction)
 
                         if (dapiTransaction.isChainLocked && pendingTransaction.hash === transaction.hash && pendingTransaction.outputs
                                 .some(output => output.satoshis >= amount &&
                                     // @ts-ignore
                                     output.script.toAddress('testnet').toString() === address)) {
                             return {
-                                txid: pendingTransaction.hash,
+                                txid: transaction.hash(),
                                 chainLocked: dapiTransaction.height
                             }
                         }
@@ -174,8 +183,8 @@ export class DashCoreSDK {
                 case "rawTransaction":
                     const tx = event.data
                     if (!pendingTransactions.some(tx => tx.hash)) {
-                        const transaction = new Transaction(tx)
-                        console.log('pending transaction', transaction.hash)
+                        const transaction = Transaction.fromBytes(hexToBytes(tx))
+                        console.log('pending transaction', transaction.hash())
                         pendingTransactions.push(transaction)
                     }
                     break;
@@ -183,14 +192,14 @@ export class DashCoreSDK {
                     for (const pendingTransaction of pendingTransactions) {
                         const instantSendLock = InstantLock.fromHex(event.data)
 
-                        if (instantSendLock.txid === pendingTransaction.hash &&
+                        if (bytesToHex(instantSendLock.txId) === pendingTransaction.hash() &&
                             pendingTransaction.outputs
                                 .some(output => output.satoshis >= amount &&
                                     // @ts-ignore
                                     output.script.toAddress('testnet').toString() === address)) {
 
                             return {
-                                txid: instantSendLock.txid,
+                                txid: bytesToHex(instantSendLock.txId),
                                 instantLocked: event.data
                             }
                         }
@@ -232,18 +241,18 @@ export class DashCoreSDK {
 
                 switch (responses.oneofKind) {
                     case "rawMerkleBlock":
-                        const merkleBlock = MerkleBlock.fromBuffer(Buffer.from(bytesToHex(responses.rawMerkleBlock), 'hex'))
-                        console.log('rawmerkleblock', merkleBlock.header.hash)
+                        const merkleBlock = MerkleBlock.fromBytes(responses.rawMerkleBlock)
+                        console.log('rawmerkleblock', merkleBlock.blockHeader.hash())
                         yield({
                             event: 'rawMerkleBlock',
                             data: bytesToHex(responses.rawMerkleBlock)
                         })
                         break;
                     case "rawTransactions":
-                        console.log(`rawtransactions (${responses.rawTransactions.transactions.map((transaction) => new Transaction(bytesToHex(transaction)).hash)+','})`)
+                        console.log(`rawtransactions (${responses.rawTransactions.transactions.map((transaction) => Transaction.fromBytes(transaction).hash())+','})`)
                         for (const transaction of responses.rawTransactions.transactions) {
-                            const tx = new Transaction(bytesToHex(transaction))
-                            if(tx.outputs.some((output) => output.script.toAddress('testnet').toString())) {
+                            const tx = Transaction.fromBytes(transaction)
+                            if(tx.outputs.some((output) => output.getAddress(   Network.Testnet))) {
                                 yield ({
                                     event: 'rawTransaction',
                                     data: bytesToHex(transaction)

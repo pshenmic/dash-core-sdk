@@ -1,5 +1,5 @@
 import {base58} from '@scure/base'
-import {bytesToHex, doubleSHA256} from "./utils";
+import {bytesToHex, doubleSHA256} from "./utils.js";
 
 export class Base58Check {
   static encode(data: Uint8Array) {

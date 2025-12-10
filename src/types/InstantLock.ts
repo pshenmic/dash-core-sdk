@@ -1,6 +1,6 @@
-import { bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../utils'
-import { OutPoint } from './OutPoint'
-import { InstantLockJSON } from '../types'
+import { bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../utils.js'
+import { OutPoint } from './OutPoint.js'
+import { InstantLockJSON } from '../types.js'
 
 export class InstantLock {
   version: number

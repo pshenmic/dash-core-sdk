@@ -1,12 +1,12 @@
-import { Script } from './Script'
+import {Script} from "./Script.js";
 import {
   bytesToHex,
   decodeCompactSize,
   encodeCompactSize,
   getCompactVariableSize,
   hexToBytes
-} from '../utils'
-import { InputJSON } from '../types'
+} from '../utils.js'
+import { InputJSON } from '../types.js'
 
 export class Input {
   txId: Uint8Array

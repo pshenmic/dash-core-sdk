@@ -1,8 +1,8 @@
-import { Script } from './Script'
-import { bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../utils'
-import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES } from '../constants'
-import { Base58Check } from '../base58check'
-import { OutputJSON } from '../types'
+import { Script } from './Script.js'
+import { bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../utils.js'
+import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES } from '../constants.js'
+import { Base58Check } from '../base58check.js'
+import { OutputJSON } from '../types.js'
 
 export class Output {
   satoshis: bigint

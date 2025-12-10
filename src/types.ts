@@ -1,4 +1,4 @@
-import {TransactionType} from "./constants";
+import {TransactionType} from "./constants.js";
 
 export type TransactionJSON = {
   version: number
