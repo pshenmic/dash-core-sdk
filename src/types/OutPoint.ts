@@ -2,10 +2,10 @@ import { bytesToHex, hexToBytes } from '../utils'
 import { OutPointJSON } from '../types'
 
 export class OutPoint {
-  txId: Uint8Array
+  txId: string
   vOut: number
 
-  constructor (txId: Uint8Array, vOut: number) {
+  constructor (txId: string, vOut: number) {
     this.txId = txId
     this.vOut = vOut
   }
@@ -15,7 +15,7 @@ export class OutPoint {
     const vOutView = new DataView(new ArrayBuffer(4))
     vOutView.setUint32(0, this.vOut, true)
 
-    out.set(this.txId.toReversed(), 0)
+    out.set(hexToBytes(this.txId).toReversed(), 0)
     out.set(new Uint8Array(vOutView.buffer), this.txId.length)
 
     return out
@@ -31,7 +31,7 @@ export class OutPoint {
     const txId = bytes.slice(0, 32)
     const vOut = dataView.getUint32(32, true)
 
-    return new OutPoint(txId.toReversed(), vOut)
+    return new OutPoint(bytesToHex(txId.toReversed()), vOut)
   }
 
   static fromHex (hex: string): OutPoint {
@@ -40,7 +40,7 @@ export class OutPoint {
 
   toJSON (): OutPointJSON {
     return {
-      txId: bytesToHex(this.txId),
+      txId: this.txId,
       vOut: this.vOut
     }
   }
