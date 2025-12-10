@@ -6,7 +6,7 @@
     "build": "tsc && rollup -c rollup.config.js",
     "build:grpc": "protoc --ts_out proto/generated --ts_opt generate_dependencies --ts_opt client_generic --proto_path proto core.proto && npm run patch:grpc",
     "patch:grpc": "node scripts/patch-esm-grpc.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"No  tests yet\"",
     "gen-proto": "protoc -I=./proto --ts_out=proto/generated ./proto/core.proto",
     "lint": "ts-standard --fix"
   },
