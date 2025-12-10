@@ -1,6 +1,6 @@
-import { Network, WIFNetworkPrefix } from '../constants'
-import { Base58Check } from '../base58check'
-import { PublicKey } from './PublicKey'
+import { Network, WIFNetworkPrefix } from '../constants.js'
+import { Base58Check } from '../base58check.js'
+import { PublicKey } from './PublicKey.js'
 
 export class PrivateKey {
   network: Network

@@ -1,8 +1,8 @@
-import { PrivateKey } from './PrivateKey'
+import { PrivateKey } from './PrivateKey.js'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
-import { bytesToHex, hexToBytes, SHA256RIPEMD160 } from '../utils'
-import { Base58Check } from '../base58check'
-import { PublicKeyJSON } from '../types'
+import { bytesToHex, hexToBytes, SHA256RIPEMD160 } from '../utils.js'
+import { Base58Check } from '../base58check.js'
+import { PublicKeyJSON } from '../types.js'
 
 export class PublicKey {
   inner: Uint8Array

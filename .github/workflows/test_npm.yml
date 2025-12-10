@@ -1,0 +1,32 @@
+name: Build
+
+on:
+  push:
+    branches: [ "master", "v1.*-dev" ]
+  pull_request:
+    branches: [ "master", "v1.*-dev" ]
+
+jobs:
+  test_npm:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22.12.0, 20.x, 22.x, 24.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: |
+          npm install
+
+      - name: Run tests with npm
+        run: |
+          npm test
+

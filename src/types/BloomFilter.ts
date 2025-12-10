@@ -1,8 +1,8 @@
 import {
   BLOOM_FILTER_FALSE_POSITIVE_RATE
-} from '../constants'
+} from '../constants.js'
 import BloomFilter from 'bloom-filter'
-import { encodeCompactSize } from '../utils'
+import { encodeCompactSize } from '../utils.js'
 
 export class BloomFilterWriter {
   nTweak: number

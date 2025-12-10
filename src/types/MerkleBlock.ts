@@ -1,7 +1,7 @@
-import { BlockHeader } from './BlockHeader'
-import { MerkleTree } from './MerkleTree'
-import { hexToBytes } from '../utils'
-import { MerkleBlockJSON } from '../types'
+import { BlockHeader } from './BlockHeader.js'
+import { MerkleTree } from './MerkleTree.js'
+import { hexToBytes } from '../utils.js'
+import { MerkleBlockJSON } from '../types.js'
 
 export class MerkleBlock {
   blockHeader: BlockHeader

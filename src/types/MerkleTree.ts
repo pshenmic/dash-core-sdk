@@ -1,6 +1,6 @@
-import { bytesToHex, decodeCompactSize, doubleSHA256, getCompactVariableSize, hexToBytes } from '../utils'
-import { MAX_BLOCK_WEIGHT, MIN_TRANSACTION_WEIGHT } from '../constants'
-import { MerkleTreeJSON } from '../types'
+import { bytesToHex, decodeCompactSize, doubleSHA256, getCompactVariableSize, hexToBytes } from '../utils.js'
+import { MAX_BLOCK_WEIGHT, MIN_TRANSACTION_WEIGHT } from '../constants.js'
+import { MerkleTreeJSON } from '../types.js'
 
 export class MerkleTree {
   transactionCount: number
