@@ -2,9 +2,9 @@ name: Build
 
 on:
   push:
-    branches: [ "master", "v0.*-dev" ]
+    branches: [ "master", "v1.*-dev" ]
   pull_request:
-    branches: [ "master", "v0.*-dev" ]
+    branches: [ "master", "v1.*-dev" ]
 
 jobs:
   test_npm:
