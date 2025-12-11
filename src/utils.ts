@@ -1,3 +1,4 @@
+import {Network} from "./constants.js";
 import { sha256 as Sha256 } from 'sha.js'
 import Ripemd160 from 'ripemd160'
 
@@ -93,4 +94,17 @@ export function SHA256RIPEMD160 (data: Uint8Array): Uint8Array {
   const firstStage = new Uint8Array(new Sha256().update(data).digest())
 
   return new Uint8Array(new Ripemd160().update(firstStage).digest())
+}
+
+
+export function networkValueToEnumValue(value: Network | keyof typeof Network): Network {
+  if (typeof value === 'string') {
+    if (value.toLowerCase() === 'mainnet') {
+      return Network.Mainnet
+    } else {
+      return Network.Testnet
+    }
+  } else {
+    return value
+  }
 }

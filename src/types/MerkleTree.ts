@@ -4,10 +4,10 @@ import { MerkleTreeJSON } from '../types.js'
 
 export class MerkleTree {
   transactionCount: number
-  hashes: Uint8Array[]
+  hashes: string[]
   flags: boolean[]
 
-  constructor (transactionCount: number, hashes: Uint8Array[], flags: boolean[]) {
+  constructor (transactionCount: number, hashes: string[], flags: boolean[]) {
     this.transactionCount = transactionCount
     this.hashes = hashes
     this.flags = flags
@@ -17,13 +17,13 @@ export class MerkleTree {
     return (this.transactionCount + (1 << height) - 1) >> height
   }
 
-  calcHash (height: number, pos: number, txIds: Uint8Array[]): Uint8Array {
+  calcHash (height: number, pos: number, txIds: string[]): string {
     if (height === 0) {
       return txIds[pos]
     } else {
-      const left: Uint8Array = this.calcHash(height - 1, pos * 2, txIds)
+      const left: string = this.calcHash(height - 1, pos * 2, txIds)
 
-      let right: Uint8Array
+      let right: string
 
       if (pos * 2 + 1 < this.calcTreeWidth(height - 1)) {
         right = this.calcHash(height - 1, pos * 2 + 1, txIds)
@@ -35,15 +35,18 @@ export class MerkleTree {
     }
   }
 
-  parentHash (left: Uint8Array, right: Uint8Array): Uint8Array {
-    const union = new Uint8Array(left.byteLength + right.byteLength)
-    union.set(left, 0)
-    union.set(right, left.byteLength)
+  parentHash (left: string, right: string): string {
+    const leftBytes = hexToBytes(left)
+    const rightBytes = hexToBytes(right)
 
-    return doubleSHA256(union)
+    const union = new Uint8Array(leftBytes.byteLength + rightBytes.byteLength)
+    union.set(leftBytes, 0)
+    union.set(rightBytes, leftBytes.byteLength)
+
+    return bytesToHex(doubleSHA256(union))
   }
 
-  extractMatches (matches: Uint8Array[], indexes: number[]): Uint8Array {
+  extractMatches (matches: string[], indexes: number[]): string {
     matches.length = 0
     indexes.length = 0
 
@@ -74,7 +77,7 @@ export class MerkleTree {
     return this.traverseAndExtract(height, 0, matches, indexes, state)
   }
 
-  traverseAndExtract (height: number, pos: number, matches: Uint8Array[], indexes: number[], state: { bitsUsed: number, hashUsed: number }): Uint8Array {
+  traverseAndExtract (height: number, pos: number, matches: string[], indexes: number[], state: { bitsUsed: number, hashUsed: number }): string {
     if (state.bitsUsed >= this.flags.length) {
       throw new Error('MerkleTree: traverseAndExtract(): flags overflow')
     }
@@ -97,9 +100,9 @@ export class MerkleTree {
 
       return hash
     } else {
-      const left = this.traverseAndExtract(height - 1, pos * 2, matches, indexes, state)
+      const left: string = this.traverseAndExtract(height - 1, pos * 2, matches, indexes, state)
 
-      let right
+      let right: string
 
       if (pos * 2 + 1 < this.calcTreeWidth(height - 1)) {
         right = this.traverseAndExtract(
@@ -110,7 +113,7 @@ export class MerkleTree {
           state
         )
 
-        if (bytesToHex(right) === bytesToHex(left)) {
+        if (right === left) {
           throw new Error('MerkleTree: traverseAndExtract(): IdenticalHashesFound')
         }
       } else {
@@ -126,11 +129,11 @@ export class MerkleTree {
     const transactionCount = dataView.getUint32(0, true)
     const hashCount = decodeCompactSize(4, bytes)
 
-    const hashes: Uint8Array[] = []
+    const hashes: string[] = []
     let hashOffset = 4 + getCompactVariableSize(hashCount)
 
     for (let i = 0; i < hashCount; i++) {
-      const hash = bytes.slice(hashOffset, hashOffset + 32)
+      const hash = bytesToHex(bytes.slice(hashOffset, hashOffset + 32))
       hashes.push(hash)
 
       hashOffset += 32
@@ -156,11 +159,9 @@ export class MerkleTree {
   }
 
   toJSON (): MerkleTreeJSON {
-    const hashes = this.hashes.map(hash => bytesToHex(hash))
-
     return {
       transactionCount: this.transactionCount,
-      hashes,
+      hashes: this.hashes,
       flags: this.flags
     }
   }

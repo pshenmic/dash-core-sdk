@@ -4,13 +4,13 @@ import x11 from '@dashevo/x11-hash-js'
 
 export class BlockHeader {
   version: number
-  previousBlockHash: Uint8Array
-  merkleRoot: Uint8Array
+  previousBlockHash: string
+  merkleRoot: string
   time: number
   nBits: number
   nonce: number
 
-  constructor (version: number, previousBlockHash: Uint8Array, merkleRoot: Uint8Array, time: number, nBits: number, nonce: number) {
+  constructor (version: number, previousBlockHash: string, merkleRoot: string, time: number, nBits: number, nonce: number) {
     this.version = version
     this.previousBlockHash = previousBlockHash
     this.merkleRoot = merkleRoot
@@ -37,8 +37,8 @@ export class BlockHeader {
     const out = new Uint8Array(80)
 
     out.set(new Uint8Array(versionDataView.buffer), 0)
-    out.set(this.previousBlockHash.toReversed(), 4)
-    out.set(this.merkleRoot.toReversed(), 36)
+    out.set(hexToBytes(this.previousBlockHash).toReversed(), 4)
+    out.set(hexToBytes(this.merkleRoot).toReversed(), 36)
     out.set(new Uint8Array(timeDataView.buffer), 68)
     out.set(new Uint8Array(nBitsDataView.buffer), 72)
     out.set(new Uint8Array(nonceDataView.buffer), 76)
@@ -62,7 +62,7 @@ export class BlockHeader {
     const nBits = dataView.getUint32(72, true)
     const nonce = dataView.getUint32(76, true)
 
-    return new BlockHeader(version, previousBlockHash.toReversed(), merkleRoot.toReversed(), time, nBits, nonce)
+    return new BlockHeader(version, bytesToHex(previousBlockHash.toReversed()), bytesToHex(merkleRoot.toReversed()), time, nBits, nonce)
   }
 
   static fromHex (hex: string): BlockHeader {
@@ -72,8 +72,8 @@ export class BlockHeader {
   toJSON (): BlockHeaderJSON {
     return {
       version: this.version,
-      previousBlockHash: bytesToHex(this.previousBlockHash),
-      merkleRoot: bytesToHex(this.merkleRoot),
+      previousBlockHash: this.previousBlockHash,
+      merkleRoot: this.merkleRoot,
       time: this.time,
       nBits: this.nBits,
       nonce: this.nonce
