@@ -17,6 +17,12 @@ export class PrivateKey {
     return PublicKey.fromPrivateKey(this)
   }
 
+  getAddress (): string {
+    const publicKey = PublicKey.fromPrivateKey(this)
+
+    return publicKey.getAddress(this.network)
+  }
+
   toWIF (): string {
     const networkByte = WIFNetworkPrefix[this.network]
     const compressedByte = this.compressed ? 1 : 0
