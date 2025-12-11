@@ -1,4 +1,4 @@
-import {MasternodeList} from "./grpcConnectionPool.js";
+import { MasternodeList } from './grpcConnectionPool.js'
 
 export default async function getDAPINodeList (network: 'testnet' | 'mainnet'): Promise<MasternodeList> {
   const url = `https://${network === 'mainnet' ? '' : 'testnet.'}platform-explorer.pshenmic.dev/validators?isActive=true`

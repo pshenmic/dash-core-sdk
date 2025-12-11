@@ -1,5 +1,5 @@
-import { bytesToHex, hexToBytes } from '../utils'
-import { OutPointJSON } from '../types'
+import { bytesToHex, hexToBytes } from '../utils.js'
+import { OutPointJSON } from '../types.js'
 
 export class OutPoint {
   txId: string

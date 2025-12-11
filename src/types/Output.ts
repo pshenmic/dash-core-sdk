@@ -1,3 +1,8 @@
+import { Script } from './Script.js'
+import { bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../utils.js'
+import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES } from '../constants.js'
+import { Base58Check } from '../base58check.js'
+import { OutputJSON } from '../types.js'
 import { Script } from './Script'
 import {
   bytesToHex,

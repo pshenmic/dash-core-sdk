@@ -1,5 +1,5 @@
-import { bytesToHex, hexToBytes } from '../utils'
-import { BlockHeaderJSON } from '../types'
+import { bytesToHex, hexToBytes } from '../utils.js'
+import { BlockHeaderJSON } from '../types.js'
 import x11 from '@dashevo/x11-hash-js'
 
 export class BlockHeader {

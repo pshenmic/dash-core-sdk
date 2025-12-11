@@ -1,3 +1,9 @@
+export const BLOOM_FILTER_NUMBER_OF_ELEMENTS = 3
+export const DAPI_STREAM_RECONNECT_TIMEOUT = 250 * 1000
+export const DASH_VERSIONS = {
+  mainnet: { pubKeyHash: 0x4c, scriptHash: 0x10, bech32: 'dc', wif: 0xcc, private: 0x0488ade4, public: 0x0488b21e },
+  testnet: { pubKeyHash: 0x8c, scriptHash: 0x13, bech32: 'dc', wif: 0xef, private: 0x04358394, public: 0x043587cf }
+}
 export const DUST_AMOUNT = 5460
 export const FEE_PER_KB = 1000
 
@@ -321,7 +327,7 @@ export const OPCODES = {
   OP_RETURN_252: 252,
   OP_RETURN_253: 253,
   OP_RETURN_254: 254,
-  OP_INVALIDOPCODE: 255,
+  OP_INVALIDOPCODE: 255
 }
 
 export type OPCODES_ENUM = keyof typeof OPCODES
@@ -372,13 +378,13 @@ export const BLOOM_FILTER_FBA_CONSTANT = 0xfba4c795
 export const BLOOM_FILTER_FALSE_POSITIVE_RATE = 0.0001
 
 export const enum ExtraPayloadType {
-  "ProRegTx" = 0,
-  "ProUpServTx" = 1,
-  "ProUpRegTx" = 2,
-  "ProUpRevTx" = 3,
-  "CbTx" = 4,
-  "QcTx" = 5,
-  "MnHfTx" = 6,
-  "AssetLockTx" = 7,
-  "AssetUnlockTx" = 8
+  'ProRegTx' = 0,
+  'ProUpServTx' = 1,
+  'ProUpRegTx' = 2,
+  'ProUpRevTx' = 3,
+  'CbTx' = 4,
+  'QcTx' = 5,
+  'MnHfTx' = 6,
+  'AssetLockTx' = 7,
+  'AssetUnlockTx' = 8
 }
