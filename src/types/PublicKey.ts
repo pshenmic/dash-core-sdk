@@ -3,7 +3,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { bytesToHex, hexToBytes, SHA256RIPEMD160 } from '../utils'
 import { Base58Check } from '../base58check'
 import { PublicKeyJSON } from '../types'
-import { AddressNetworkPrefix, Network } from '../constants'
+import { PubKeyHashAddressNetworkPrefix, Network } from '../constants'
 
 export class PublicKey {
   inner: Uint8Array
@@ -29,7 +29,7 @@ export class PublicKey {
   }
 
   getAddress (network: Network): string {
-    const prefix = AddressNetworkPrefix[network]
+    const prefix = PubKeyHashAddressNetworkPrefix[network]
     const innerHash160 = SHA256RIPEMD160(this.inner)
 
     const encodable = new Uint8Array(1 + innerHash160.byteLength)

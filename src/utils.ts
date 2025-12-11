@@ -1,5 +1,6 @@
 import {sha256} from "sha.js";
 import ripemd160 from "ripemd160";
+import {Network} from "./constants";
 
 export function getRandomArrayItem(array: any[]): any {
   return array[Math.floor((Math.random() * array.length))]
@@ -70,7 +71,7 @@ export function encodeCompactSize(num: number | bigint): Uint8Array {
 export function getCompactVariableSize(num: number | bigint): number {
   if (num <= 252) {
     return 1
-  } else if (num > 252 && num <= 65535 ) {
+  } else if (num > 252 && num <= 65535) {
     return 3
   } else if (num > 65535 && num <= 4294967295) {
     return 5
@@ -88,5 +89,17 @@ export function doubleSHA256(data: Uint8Array): Uint8Array {
 export function SHA256RIPEMD160(data: Uint8Array): Uint8Array {
   const firstStage = new Uint8Array(new sha256().update(data).digest())
 
-  return  new Uint8Array(new ripemd160().update(firstStage).digest())
+  return new Uint8Array(new ripemd160().update(firstStage).digest())
+}
+
+export function networkValueToEnumValue(value: Network | keyof typeof Network): Network {
+  if (typeof value === 'string') {
+    if (value.toLowerCase() === 'mainnet') {
+      return Network.Mainnet
+    } else {
+      return Network.Testnet
+    }
+  } else {
+    return value
+  }
 }

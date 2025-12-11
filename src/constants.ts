@@ -329,6 +329,7 @@ export type OPCODES_ENUM = keyof typeof OPCODES
 export enum Network {
   Mainnet = 0,
   Testnet = 1,
+
 }
 
 /**
@@ -348,7 +349,7 @@ export enum NetworkPrefix {
   PubkeyPrefixMainnet = 76,
 }
 
-export const AddressNetworkPrefix = {
+export const PubKeyHashAddressNetworkPrefix = {
   [Network.Mainnet]: NetworkPrefix.PubkeyPrefixMainnet,
   [Network.Testnet]: NetworkPrefix.PubkeyPrefixTestnet,
 }

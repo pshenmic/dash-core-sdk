@@ -1,4 +1,4 @@
-import {TransactionType} from "./constants";
+import {Network, TransactionType} from "./constants";
 
 export type TransactionJSON = {
   version: number
@@ -63,3 +63,5 @@ export type ScriptChunk = {
   opcode: number,
   data?: ArrayBuffer
 }
+
+export type NetworkLike = Network | keyof typeof Network

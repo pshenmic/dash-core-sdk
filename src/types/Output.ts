@@ -1,8 +1,14 @@
 import { Script } from './Script'
-import { bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../utils'
-import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES } from '../constants'
-import { Base58Check } from '../base58check'
-import { OutputJSON } from '../types'
+import {
+  bytesToHex,
+  decodeCompactSize,
+  encodeCompactSize,
+  getCompactVariableSize,
+  hexToBytes,
+  networkValueToEnumValue
+} from '../utils'
+import { DEFAULT_NETWORK, OPCODES } from '../constants'
+import { NetworkLike, OutputJSON } from '../types'
 
 export class Output {
   satoshis: bigint
@@ -52,8 +58,10 @@ export class Output {
     return bytesToHex(this.bytes())
   }
 
-  getAddress (network: Network = DEFAULT_NETWORK): string | undefined {
-    if (network > 255) {
+  getAddress (network: NetworkLike = DEFAULT_NETWORK): string | undefined {
+    const normalNetwork = networkValueToEnumValue(network)
+
+    if (normalNetwork > 255) {
       throw new Error('Network prefix cannot be more than 255')
     }
 
@@ -65,23 +73,6 @@ export class Output {
     if (cryptoOpcodeIndex === -1) {
       return undefined
     }
-
-    const pubKeyHashChunk = this.script.parsedScriptChunks[cryptoOpcodeIndex + 1]
-
-    if (pubKeyHashChunk === undefined || pubKeyHashChunk?.data === undefined) {
-      return undefined
-    }
-
-    const pubKeyHash = pubKeyHashChunk.data
-
-    const pubKeyHashWithPrefix = new Uint8Array(1 + pubKeyHash.byteLength)
-
-    const prefix = (network ?? DEFAULT_NETWORK) === Network.Testnet ? NetworkPrefix.ScriptPrefixTestnet : NetworkPrefix.ScriptPrefixMainnet
-
-    pubKeyHashWithPrefix.set(new Uint8Array([prefix]), 0)
-    pubKeyHashWithPrefix.set(new Uint8Array(pubKeyHash), 1)
-
-    return Base58Check.encode(pubKeyHashWithPrefix)
   }
 
   toJSON (): OutputJSON {

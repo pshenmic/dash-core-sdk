@@ -1,6 +1,6 @@
 import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES, OPCODES_ENUM } from '../constants'
-import { bytesToHex, hexToBytes, SHA256RIPEMD160 } from '../utils'
-import { ScriptChunk } from '../types'
+import { bytesToHex, hexToBytes, networkValueToEnumValue, SHA256RIPEMD160 } from '../utils'
+import { NetworkLike, ScriptChunk } from '../types'
 import { Base58Check } from '../base58check'
 
 export class Script {
@@ -50,12 +50,14 @@ export class Script {
     })
   }
 
-  toAddress (network: Network = DEFAULT_NETWORK): string | undefined {
-    if (network > 255) {
+  getAddress (network: NetworkLike = DEFAULT_NETWORK): string | undefined {
+    const normalNetwork = networkValueToEnumValue(network)
+
+    if (normalNetwork > 255) {
       throw new Error('Network prefix cannot be more than 255')
     }
 
-    const cryptoOpCodes = [OPCODES.OP_PUSHBYTES_33, OPCODES.OP_PUSHBYTES_65]
+    const cryptoOpCodes = [OPCODES.OP_PUSHBYTES_33, OPCODES.OP_PUSHBYTES_65, OPCODES.OP_HASH160]
 
     const cryptoOpcodeIndex = this.parsedScriptChunks.findIndex(chunk => cryptoOpCodes.includes(chunk.opcode))
 
@@ -63,17 +65,32 @@ export class Script {
       return undefined
     }
 
-    const pubKeyHashChunk = this.parsedScriptChunks[cryptoOpcodeIndex]
+    const opcodeChunk = this.parsedScriptChunks[cryptoOpcodeIndex]
 
-    if (pubKeyHashChunk === undefined || pubKeyHashChunk?.data === undefined) {
-      return undefined
+    let pubKeyHash: Uint8Array
+    const prefix: NetworkPrefix = (normalNetwork ?? DEFAULT_NETWORK) === Network.Testnet ? NetworkPrefix.PubkeyPrefixTestnet : NetworkPrefix.PubkeyPrefixMainnet
+
+    if (opcodeChunk?.opcode === OPCODES.OP_HASH160) {
+      if (opcodeChunk === undefined) {
+        return undefined
+      }
+
+      const hashChunk = this.parsedScriptChunks[cryptoOpcodeIndex + 1]
+
+      if (hashChunk.data == null) {
+        return undefined
+      }
+
+      pubKeyHash = new Uint8Array(hashChunk.data)
+    } else {
+      if (opcodeChunk === undefined || opcodeChunk?.data === undefined) {
+        return undefined
+      }
+
+      pubKeyHash = SHA256RIPEMD160(new Uint8Array(opcodeChunk.data))
     }
 
-    const pubKeyHash: Uint8Array = SHA256RIPEMD160(new Uint8Array(pubKeyHashChunk.data))
-
     const pubKeyHashWithPrefix = new Uint8Array(1 + pubKeyHash.byteLength)
-
-    const prefix = (network ?? DEFAULT_NETWORK) === Network.Testnet ? NetworkPrefix.PubkeyPrefixTestnet : NetworkPrefix.PubkeyPrefixMainnet
 
     pubKeyHashWithPrefix.set(new Uint8Array([prefix]), 0)
     pubKeyHashWithPrefix.set(new Uint8Array(pubKeyHash), 1)
