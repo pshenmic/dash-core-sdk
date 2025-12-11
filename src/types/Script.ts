@@ -1,7 +1,7 @@
-import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES, OPCODES_ENUM } from '../constants'
-import { bytesToHex, hexToBytes, networkValueToEnumValue, SHA256RIPEMD160 } from '../utils'
-import { NetworkLike, ScriptChunk } from '../types'
-import { Base58Check } from '../base58check'
+import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES, OPCODES_ENUM } from '../constants.js'
+import { bytesToHex, hexToBytes, networkValueToEnumValue, SHA256RIPEMD160 } from '../utils.js'
+import { NetworkLike, ScriptChunk } from '../types.js'
+import { Base58Check } from '../base58check.js'
 
 export class Script {
   #parsedScript: ScriptChunk[]

@@ -1,8 +1,8 @@
-import { Network, WIFNetworkPrefix } from '../constants'
-import { Base58Check } from '../base58check'
-import { PublicKey } from './PublicKey'
-import { NetworkLike } from '../types'
-import { networkValueToEnumValue } from '../utils'
+import { Network, WIFNetworkPrefix } from '../constants.js'
+import { Base58Check } from '../base58check.js'
+import { PublicKey } from './PublicKey.js'
+import { NetworkLike } from '../types.js'
+import { networkValueToEnumValue } from '../utils.js'
 
 export class PrivateKey {
   network: Network

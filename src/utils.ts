@@ -1,4 +1,4 @@
-import {Network} from "./constants";
+import {Network} from "./constants.js";
 import { sha256 as Sha256 } from 'sha.js'
 import Ripemd160 from 'ripemd160'
 
