@@ -43,7 +43,7 @@ export class Script {
     this.#parsedScript = chunks
   }
 
-  addData (opCode: OPCODES_ENUM, data?: Uint8Array): void {
+  pushOpCode (opCode: OPCODES_ENUM, data?: Uint8Array): void {
     this.#parsedScript.push({
       opcode: OPCODES[opCode],
       data: data?.buffer as ArrayBuffer
