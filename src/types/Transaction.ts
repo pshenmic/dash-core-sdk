@@ -1,7 +1,8 @@
 import {
+  CHANGE_OUTPUT_MAX_SIZE,
   DEFAULT_NLOCK_TIME,
-  ExtraPayloadType,
-  NLOCK_TIME_BLOCK_BASED_LIMIT,
+  ExtraPayloadType, FEE_PER_BYTE, MIN_FEE_RELAY,
+  NLOCK_TIME_BLOCK_BASED_LIMIT, OPCODES_ENUM, SIGHASH_ALL, SIGNED_INPUT_MAX_SIZE,
   TRANSACTION_VERSION,
   TransactionType
 } from '../constants.js'
@@ -9,6 +10,7 @@ import { TransactionJSON } from '../types.js'
 import { Input } from './Input.js'
 import { Output } from './Output.js'
 import {
+  addressToPublicKeyHash,
   bytesToHex,
   decodeCompactSize,
   doubleSHA256,
@@ -16,6 +18,9 @@ import {
   getCompactVariableSize,
   hexToBytes
 } from '../utils.js'
+import { PrivateKey } from './PrivateKey.js'
+import { secp256k1 } from '@noble/curves/secp256k1.js'
+import { Script } from './Script.js'
 
 export class Transaction {
   version: number
@@ -25,14 +30,12 @@ export class Transaction {
   outputs: Output[]
   extraPayload?: Uint8Array
 
-  // TODO: payload
-
-  constructor (inputs: Input[], outputs: Output[], nLockTime: number, version: number, type: TransactionType, extraPayload?: Uint8Array) {
+  constructor (inputs?: Input[], outputs?: Output[], nLockTime?: number, version?: number, type?: TransactionType, extraPayload?: Uint8Array) {
     this.version = version ?? TRANSACTION_VERSION
     this.type = type ?? TransactionType.TRANSACTION_NORMAL
     this.#nLockTime = nLockTime ?? DEFAULT_NLOCK_TIME
-    this.inputs = inputs
-    this.outputs = outputs
+    this.inputs = inputs ?? []
+    this.outputs = outputs ?? []
     this.extraPayload = extraPayload
   }
 
@@ -60,6 +63,14 @@ export class Transaction {
     }
 
     this.#nLockTime = nLockTime
+  }
+
+  addInput (inputs: Input): void {
+    this.inputs.push(inputs)
+  }
+
+  addOutput (output: Output): void {
+    this.outputs.push(output)
   }
 
   getOutputAmount (): bigint {
@@ -97,13 +108,120 @@ export class Transaction {
     return undefined
   }
 
-  // sign(privateKey: Uint8Array): Uint8Array {
-  //   const tx = signer.Transaction.fromRaw(this.bytes())
-  //
-  //   tx.sign(privateKey)
-  //
-  //   return tx.toBytes(true)
-  // }
+  #signInput (privateKey: PrivateKey, inputIndex: number): void {
+    if (this.inputs.length < inputIndex) {
+      throw new Error(`input with not found (index: ${inputIndex})`)
+    }
+    if (inputIndex < 0) {
+      throw new Error('inputIndex must be greater than 0')
+    }
+
+    const publicKey = privateKey.getPublicKey()
+
+    // clone inputs
+    const savedInputs = this.inputs.map(input => Input.fromBytes(input.bytes()))
+
+    for (let i = 0; i < this.inputs.length; i++) {
+      if (i !== inputIndex) {
+        this.inputs[i].scriptSig = new Script()
+      }
+    }
+
+    const txBytes = this.bytes()
+    const sighashBytes = new Uint8Array(txBytes.length + 4)
+    sighashBytes.set(txBytes, 0)
+
+    // push value via link to sighashBytes
+    const sighashView = new DataView(sighashBytes.buffer, txBytes.length, 4)
+    sighashView.setUint32(0, SIGHASH_ALL, true)
+
+    const derSignature = secp256k1.sign(doubleSHA256(sighashBytes), privateKey.key, {
+      format: 'der',
+      prehash: false,
+      lowS: true
+    })
+
+    const signatureWithSighash = new Uint8Array(derSignature.length + 1)
+    signatureWithSighash.set(derSignature, 0)
+    signatureWithSighash[derSignature.length] = SIGHASH_ALL
+
+    const inputScript = new Script()
+
+    let sigOpcode: OPCODES_ENUM
+
+    if (signatureWithSighash.byteLength === 71) {
+      sigOpcode = 'OP_PUSHBYTES_71'
+    } else if (signatureWithSighash.byteLength === 72) {
+      sigOpcode = 'OP_PUSHBYTES_72'
+    } else if (signatureWithSighash.byteLength === 73) {
+      sigOpcode = 'OP_PUSHBYTES_73'
+    } else {
+      throw new Error('Invalid signature size')
+    }
+
+    inputScript.pushOpCode(sigOpcode, signatureWithSighash)
+    inputScript.pushOpCode('OP_PUSHBYTES_33', publicKey.inner)
+
+    this.inputs = savedInputs
+
+    this.inputs[inputIndex].scriptSig = inputScript
+  }
+
+  // TODO: MultiSig
+  sign (privateKey: PrivateKey): void {
+    for (let i = 0; i < this.inputs.length; i++) {
+      this.#signInput(privateKey, i)
+    }
+  }
+
+  generateChange (address: string, inputAmount: bigint): void {
+    if (this.inputs.length === 0) {
+      throw new Error('Before call generateChange you must set all inputs')
+    }
+    if (this.outputs.length === 0) {
+      throw new Error('Before call generateChange you must set all outputs')
+    }
+
+    const signedInputsSize = this.inputs.reduce((acc) => acc + BigInt(SIGNED_INPUT_MAX_SIZE), BigInt(0))
+
+    const outputAmount = this.outputs.reduce((acc, curr) => acc + curr.satoshis, 0n)
+
+    if (inputAmount < outputAmount) {
+      throw new Error('Inputs amount lower than output amount')
+    }
+
+    const dummyTx = Transaction.fromBytes(this.bytes())
+    dummyTx.inputs = []
+
+    const txBytesLength = BigInt(dummyTx.bytes().byteLength) + signedInputsSize
+
+    const outputsWithChangePrediction = outputAmount + BigInt(CHANGE_OUTPUT_MAX_SIZE) + txBytesLength
+    let changeAmount = inputAmount - outputsWithChangePrediction * BigInt(FEE_PER_BYTE)
+
+    if (inputAmount === outputAmount + changeAmount) {
+      return
+    }
+
+    const outputScript = new Script()
+
+    outputScript.pushOpCode('OP_DUP')
+    outputScript.pushOpCode('OP_HASH160')
+    outputScript.pushOpCode('OP_PUSHBYTES_20', addressToPublicKeyHash(address))
+    outputScript.pushOpCode('OP_EQUALVERIFY')
+    outputScript.pushOpCode('OP_CHECKSIG')
+
+    if (changeAmount < MIN_FEE_RELAY) {
+      changeAmount = BigInt(MIN_FEE_RELAY)
+    }
+
+    const changeOutput = new Output(changeAmount, outputScript)
+
+    if (inputAmount < outputAmount + BigInt(this.bytes().byteLength + changeOutput.bytes().byteLength + getCompactVariableSize(this.outputs.length + 1))) {
+      return
+    }
+
+    this.outputs.push(changeOutput)
+  }
 
   bytes (): Uint8Array {
     // 4 bytes version & type packed
