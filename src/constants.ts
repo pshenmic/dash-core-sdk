@@ -361,7 +361,7 @@ export enum NetworkPrefix {
 
 export const PubKeyHashAddressNetworkPrefix = {
   [Network.Mainnet]: NetworkPrefix.PubkeyPrefixMainnet,
-  [Network.Testnet]: NetworkPrefix.PubkeyPrefixTestnet,
+  [Network.Testnet]: NetworkPrefix.PubkeyPrefixTestnet
 }
 
 export const DEFAULT_NETWORK = Network.Testnet
