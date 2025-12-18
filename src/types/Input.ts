@@ -9,18 +9,18 @@ import {
 import { InputJSON } from '../types.js'
 
 export class Input {
-  txId: Uint8Array
+  txId: string
   vOut: number
   scriptSig: Script
   sequence: number
 
   constructor (txId: string | Uint8Array, vOut: number, scriptSig: Script, sequence: number) {
     if (typeof txId === 'string') {
-      this.txId = hexToBytes(txId)
-    } else if (ArrayBuffer.isView(txId)) {
       this.txId = txId
+    } else if (ArrayBuffer.isView(txId)) {
+      this.txId = bytesToHex(txId)
     } else {
-      this.txId = new Uint8Array(32)
+      this.txId = bytesToHex(new Uint8Array(32))
     }
 
     this.vOut = vOut
@@ -29,11 +29,11 @@ export class Input {
   }
 
   getTxIdHex (): string {
-    return bytesToHex(this.txId.toReversed())
+    return this.txId
   }
 
   bytes (): Uint8Array {
-    const txIdBytes = this.txId
+    const txIdBytes = hexToBytes(this.txId)
     const vOutBytes = new DataView(new ArrayBuffer(4))
     const scriptSigBytes = this.scriptSig.bytes()
     const scriptSigSizeBytes = encodeCompactSize(scriptSigBytes.byteLength)
@@ -83,7 +83,7 @@ export class Input {
 
   toJSON (): InputJSON {
     return {
-      txId: bytesToHex(this.txId),
+      txId: this.txId,
       vOut: this.vOut,
       scriptSig: this.scriptSig.ASMString(),
       sequence: this.sequence

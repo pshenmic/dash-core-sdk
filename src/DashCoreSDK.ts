@@ -190,13 +190,13 @@ export class DashCoreSDK {
           for (const pendingTransaction of pendingTransactions) {
             const instantSendLock = InstantLock.fromHex(event.data)
 
-            if (bytesToHex(instantSendLock.txId) === pendingTransaction.hash() &&
+            if (instantSendLock.txId === pendingTransaction.hash() &&
                 pendingTransaction.outputs
                   .some(output => output.satoshis >= amount &&
                         // @ts-expect-error
                         output.script.toAddress('testnet').toString() === address)) {
               return {
-                txid: bytesToHex(instantSendLock.txId),
+                txid: instantSendLock.txId,
                 instantLocked: event.data
               }
             }

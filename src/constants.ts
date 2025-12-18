@@ -332,6 +332,12 @@ export const OPCODES = {
 
 export type OPCODES_ENUM = keyof typeof OPCODES
 
+export enum Network {
+  Mainnet = 0,
+  Testnet = 1,
+
+}
+
 /**
  * script network prefix:
  * mainnet: 16
@@ -349,9 +355,9 @@ export enum NetworkPrefix {
   PubkeyPrefixMainnet = 76,
 }
 
-export enum Network {
-  Mainnet = 0,
-  Testnet = 1,
+export const PubKeyHashAddressNetworkPrefix = {
+  [Network.Mainnet]: NetworkPrefix.PubkeyPrefixMainnet,
+  [Network.Testnet]: NetworkPrefix.PubkeyPrefixTestnet,
 }
 
 export const DEFAULT_NETWORK = Network.Testnet

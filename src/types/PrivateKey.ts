@@ -1,20 +1,28 @@
 import { Network, WIFNetworkPrefix } from '../constants.js'
 import { Base58Check } from '../base58check.js'
 import { PublicKey } from './PublicKey.js'
+import { NetworkLike } from '../types.js'
+import { networkValueToEnumValue } from '../utils.js'
 
 export class PrivateKey {
   network: Network
   key: Uint8Array
   compressed: boolean
 
-  constructor (key: Uint8Array, network: Network, compressed: boolean) {
+  constructor (key: Uint8Array, network: NetworkLike, compressed: boolean) {
     this.key = key
-    this.network = network
+    this.network = networkValueToEnumValue(network)
     this.compressed = compressed
   }
 
   getPublicKey (): PublicKey {
     return PublicKey.fromPrivateKey(this)
+  }
+
+  getAddress (): string {
+    const publicKey = PublicKey.fromPrivateKey(this)
+
+    return publicKey.getAddress(this.network)
   }
 
   toWIF (): string {
@@ -45,7 +53,7 @@ export class PrivateKey {
     return new PrivateKey(body, WIFNetworkPrefix[networkByte], compressed === 1)
   }
 
-  static fromBytes (bytes: Uint8Array, network: Network, compressed: boolean = true): PrivateKey {
-    return new PrivateKey(bytes, network, compressed)
+  static fromBytes (bytes: Uint8Array, network: NetworkLike, compressed: boolean = true): PrivateKey {
+    return new PrivateKey(bytes, networkValueToEnumValue(network), compressed)
   }
 }
