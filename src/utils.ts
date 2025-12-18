@@ -1,6 +1,7 @@
 import {Network} from "./constants.js";
 import { sha256 as Sha256 } from 'sha.js'
 import Ripemd160 from 'ripemd160'
+import {Base58Check} from "./base58check.js";
 
 export function getRandomArrayItem (array: any[]): any {
   return array[Math.floor((Math.random() * array.length))]
@@ -107,4 +108,8 @@ export function networkValueToEnumValue(value: Network | keyof typeof Network): 
   } else {
     return value
   }
+}
+
+export function addressToPublicKeyHash(address: string): Uint8Array {
+  return Base58Check.decode(address).slice(1)
 }
