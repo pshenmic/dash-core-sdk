@@ -1,3 +1,5 @@
 export * from './ProRegTX.js'
 export * from './ProUpServTx.js'
 export * from './ProUpRegTx.js'
+export * from './ProUpRevTx.js'
+export * from './CbTx.js'

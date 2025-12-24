@@ -1,6 +1,5 @@
 import {Network, TransactionType} from './constants.js'
-import {ProRegTX, ProUpRegTx, ProUpServTx} from "./types/ExtraPayload/index.js";
-import {ProUpRevTx} from "./types/ExtraPayload/ProUpRevTx.js";
+import {ProRegTX, ProUpRegTx, ProUpServTx, ProUpRevTx, CbTx} from "./types/ExtraPayload/index.js";
 
 export interface ScriptChunk {
   opcode: number
@@ -9,7 +8,7 @@ export interface ScriptChunk {
 
 export type NetworkLike = Network | keyof typeof Network
 
-export type ExtraPayload = ProRegTX | ProUpServTx | ProUpRegTx | ProUpRevTx
+export type ExtraPayload = ProRegTX | ProUpServTx | ProUpRegTx | ProUpRevTx | CbTx
 
 export interface TransactionJSON {
   version: number
@@ -17,7 +16,7 @@ export interface TransactionJSON {
   nLockTime: number
   inputs: InputJSON[]
   outputs: OutputJSON[]
-  extraPayload: ProRegTxJSON | ProUpRegTxJSON | ProUpRevTxJSON | ProUpServTxJSON | null
+  extraPayload: ProRegTxJSON | ProUpRegTxJSON | ProUpRevTxJSON | ProUpServTxJSON | CbTxJSON | null
 }
 
 export interface OutPointJSON {
@@ -123,4 +122,14 @@ export interface ProUpRevTxJSON {
   reason: number;
   inputsHash: string;
   payloadSig: string;
+}
+
+export interface CbTxJSON {
+  version: number;
+  height: number;
+  merkleRootMNList: string;
+  merkleRootQuorums: string | null;
+  bestCLHeightDiff: string | null;
+  bestCLSignature: string | null;
+  creditPoolBalance: string | null;
 }

@@ -33,22 +33,22 @@ export function decodeCompactSize(offset: number, bytes: Uint8Array): number | b
 }
 
 export function encodeCompactSize(num: number | bigint): Uint8Array {
-  if (num <= 252 && typeof num === 'number') {
-    return new Uint8Array([num])
-  } else if (num > 252 && num <= 65535 && typeof num === 'number') {
+  if (num <= 252) {
+    return new Uint8Array([Number(num)])
+  } else if (num > 252 && num <= 65535) {
     const dataView = new DataView(new ArrayBuffer(2))
 
-    dataView.setUint16(0, num, true)
+    dataView.setUint16(0, Number(num), true)
 
     const out = new Uint8Array(3)
     out.set(new Uint8Array([253]), 0)
     out.set(new Uint8Array(dataView.buffer), 1)
 
     return out
-  } else if (num > 65535 && num <= 4294967295 && typeof num === 'number') {
+  } else if (num > 65535 && num <= 4294967295) {
     const dataView = new DataView(new ArrayBuffer(4))
 
-    dataView.setUint32(0, num, true)
+    dataView.setUint32(0, Number(num), true)
 
     const out = new Uint8Array(5)
     out.set(new Uint8Array([254]), 0)

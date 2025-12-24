@@ -21,8 +21,7 @@ import {
 import { PrivateKey } from './PrivateKey.js'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { Script } from './Script.js'
-import { ProRegTX, ProUpServTx } from './ExtraPayload/index.js'
-import { ProUpRevTx } from './ExtraPayload/ProUpRevTx.js'
+import { ProRegTX, ProUpServTx, ProUpRevTx, ProUpRegTx, CbTx } from './ExtraPayload/index.js'
 
 export class Transaction {
   version: number
@@ -353,10 +352,13 @@ export class Transaction {
           extraPayloadHandler = ProUpServTx.fromBytes
           break
         case TransactionType.TRANSACTION_PROVIDER_UPDATE_REGISTRAR:
-          extraPayloadHandler = ProUpRevTx.fromBytes
+          extraPayloadHandler = ProUpRegTx.fromBytes
           break
         case TransactionType.TRANSACTION_PROVIDER_UPDATE_REVOKE:
           extraPayloadHandler = ProUpRevTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_COINBASE:
+          extraPayloadHandler = CbTx.fromBytes
           break
         default:
           throw new Error(`Unsupported extra payload type ${type}`)
