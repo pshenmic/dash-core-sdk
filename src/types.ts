@@ -1,4 +1,15 @@
 import {Network, TransactionType} from './constants.js'
+import {ProRegTX, ProUpRegTx, ProUpServTx} from "./types/ExtraPayload/index.js";
+import {ProUpRevTx} from "./types/ExtraPayload/ProUpRevTx.js";
+
+export interface ScriptChunk {
+  opcode: number
+  data?: ArrayBuffer
+}
+
+export type NetworkLike = Network | keyof typeof Network
+
+export type ExtraPayload = ProRegTX | ProUpServTx | ProUpRegTx | ProUpRevTx
 
 export interface TransactionJSON {
   version: number
@@ -6,7 +17,7 @@ export interface TransactionJSON {
   nLockTime: number
   inputs: InputJSON[]
   outputs: OutputJSON[]
-  extraPayload: string | null
+  extraPayload: ProRegTxJSON | ProUpRegTxJSON | ProUpRevTxJSON | ProUpServTxJSON | null
 }
 
 export interface OutPointJSON {
@@ -59,9 +70,57 @@ export interface PublicKeyJSON {
   compressed: boolean
 }
 
-export interface ScriptChunk {
-  opcode: number
-  data?: ArrayBuffer
+export interface ProRegTxJSON {
+  version: number;
+  type: number;
+  mode: number;
+  collateralOutpoint: OutPointJSON;
+  ipAddress: string;
+  port: number;
+
+  keyIdOwner: string;
+  keyIdVoting: string;
+  pubKeyOperator: string;
+  operatorReward: number;
+  scriptPayout: string;
+  inputsHash: string;
+  platformNodeID?: string;
+  platformP2PPort?: number;
+  platformHTTPPort?: number;
+  payloadSig?: string;
 }
 
-export type NetworkLike = Network | keyof typeof Network
+export interface ProUpServTxJSON {
+  version: number;
+  type: number;
+  proTxHash: string;
+  ipAddress: string;
+  port: number;
+
+  scriptOperatorPayout: string;
+  inputsHash: string;
+  platformNodeID?: string;
+  platformP2PPort?: number;
+  platformHTTPPort?: number;
+
+  payloadSig: string;
+}
+
+export interface ProUpRegTxJSON {
+  version: number;
+  proTxHash: string;
+  mode: number;
+  keyIdVoting: string;
+  pubKeyOperator: string;
+  scriptPayout: string;
+  inputsHash: string;
+  payloadSig: string;
+}
+
+export interface ProUpRevTxJSON {
+  version: number;
+  proTxHash: string;
+  reason: number;
+  inputsHash: string;
+  payloadSig: string;
+}
