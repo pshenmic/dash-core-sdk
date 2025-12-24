@@ -1,5 +1,10 @@
 import {Network, TransactionType} from './constants.js'
-import {ProRegTX, ProUpRegTx, ProUpServTx, ProUpRevTx, CbTx} from "./types/ExtraPayload/index.js";
+import {ProRegTX} from "./types/ExtraPayload/ProRegTX.js";
+import {CbTx} from "./types/ExtraPayload/CbTx.js";
+import {ProUpRevTx} from "./types/ExtraPayload/ProUpRevTx.js";
+import {ProUpRegTx} from "./types/ExtraPayload/ProUpRegTx.js";
+import {ProUpServTx} from "./types/ExtraPayload/ProUpServTx.js";
+import {QcTx} from "./types/ExtraPayload/QcTx.js";
 
 export interface ScriptChunk {
   opcode: number
@@ -8,7 +13,7 @@ export interface ScriptChunk {
 
 export type NetworkLike = Network | keyof typeof Network
 
-export type ExtraPayload = ProRegTX | ProUpServTx | ProUpRegTx | ProUpRevTx | CbTx
+export type ExtraPayload = ProRegTX | ProUpServTx | ProUpRegTx | ProUpRevTx | CbTx | QcTx
 
 export interface TransactionJSON {
   version: number
@@ -16,7 +21,7 @@ export interface TransactionJSON {
   nLockTime: number
   inputs: InputJSON[]
   outputs: OutputJSON[]
-  extraPayload: ProRegTxJSON | ProUpRegTxJSON | ProUpRevTxJSON | ProUpServTxJSON | CbTxJSON | null
+  extraPayload: ProRegTxJSON | ProUpRegTxJSON | ProUpRevTxJSON | ProUpServTxJSON | CbTxJSON | QcTxJSON | null
 }
 
 export interface OutPointJSON {
@@ -132,4 +137,28 @@ export interface CbTxJSON {
   bestCLHeightDiff: string | null;
   bestCLSignature: string | null;
   creditPoolBalance: string | null;
+}
+
+export interface QcTxJSON {
+  version: number;
+  height: number;
+  commitment: QfCommitJSON
+}
+
+
+
+
+
+
+export interface QfCommitJSON {
+  version: number;
+  llmqType: number;
+  quorumHash: string;
+  quorumIndex: number | null;
+  signers: string;
+  validMembers: string;
+  quorumPublicKey: string;
+  quorumVvecHash: string;
+  quorumSig: string;
+  sig: string;
 }

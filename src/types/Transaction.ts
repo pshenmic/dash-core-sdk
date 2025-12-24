@@ -21,7 +21,12 @@ import {
 import { PrivateKey } from './PrivateKey.js'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { Script } from './Script.js'
-import { ProRegTX, ProUpServTx, ProUpRevTx, ProUpRegTx, CbTx } from './ExtraPayload/index.js'
+import {ProRegTX} from "./ExtraPayload/ProRegTX.js";
+import {ProUpServTx} from "./ExtraPayload/ProUpServTx.js";
+import {ProUpRegTx} from "./ExtraPayload/ProUpRegTx.js";
+import {ProUpRevTx} from "./ExtraPayload/ProUpRevTx.js";
+import {CbTx} from "./ExtraPayload/CbTx.js";
+import {QcTx} from "./ExtraPayload/QcTx.js";
 
 export class Transaction {
   version: number
@@ -359,6 +364,9 @@ export class Transaction {
           break
         case TransactionType.TRANSACTION_COINBASE:
           extraPayloadHandler = CbTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_QUORUM_COMMITMENT:
+          extraPayloadHandler = QcTx.fromBytes
           break
         default:
           throw new Error(`Unsupported extra payload type ${type}`)
