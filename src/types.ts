@@ -5,6 +5,7 @@ import {ProUpRevTx} from "./types/ExtraPayload/ProUpRevTx.js";
 import {ProUpRegTx} from "./types/ExtraPayload/ProUpRegTx.js";
 import {ProUpServTx} from "./types/ExtraPayload/ProUpServTx.js";
 import {QcTx} from "./types/ExtraPayload/QcTx.js";
+import {MnHfTx} from "./types/ExtraPayload/MnHfTx.js";
 
 export interface ScriptChunk {
   opcode: number
@@ -13,7 +14,7 @@ export interface ScriptChunk {
 
 export type NetworkLike = Network | keyof typeof Network
 
-export type ExtraPayload = ProRegTX | ProUpServTx | ProUpRegTx | ProUpRevTx | CbTx | QcTx
+export type ExtraPayload = ProRegTX | ProUpServTx | ProUpRegTx | ProUpRevTx | CbTx | QcTx | MnHfTx
 
 export interface TransactionJSON {
   version: number
@@ -21,7 +22,7 @@ export interface TransactionJSON {
   nLockTime: number
   inputs: InputJSON[]
   outputs: OutputJSON[]
-  extraPayload: ProRegTxJSON | ProUpRegTxJSON | ProUpRevTxJSON | ProUpServTxJSON | CbTxJSON | QcTxJSON | null
+  extraPayload: ProRegTxJSON | ProUpRegTxJSON | ProUpRevTxJSON | ProUpServTxJSON | CbTxJSON | QcTxJSON | MnHfTxJSON | null
 }
 
 export interface OutPointJSON {
@@ -145,9 +146,10 @@ export interface QcTxJSON {
   commitment: QfCommitJSON
 }
 
-
-
-
+export interface MnHfTxJSON {
+  version: number;
+  commitment: MnHfSignalJSON;
+}
 
 
 export interface QfCommitJSON {
@@ -160,5 +162,11 @@ export interface QfCommitJSON {
   quorumPublicKey: string;
   quorumVvecHash: string;
   quorumSig: string;
+  sig: string;
+}
+
+export interface MnHfSignalJSON {
+  versionBit: number;
+  quorumHash: string;
   sig: string;
 }

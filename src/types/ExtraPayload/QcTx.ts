@@ -1,5 +1,5 @@
 import {bytesToHex, hexToBytes} from "../../utils.js";
-import {QfCommit} from "./QfCommit.js";
+import {QfCommit} from "../Messages/QfCommit.js";
 import {QcTxJSON} from "../../types.js";
 
 export class QcTx {

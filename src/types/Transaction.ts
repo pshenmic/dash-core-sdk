@@ -6,9 +6,9 @@ import {
   TRANSACTION_VERSION,
   TransactionType
 } from '../constants.js'
-import { ExtraPayload, TransactionJSON } from '../types.js'
-import { Input } from './Input.js'
-import { Output } from './Output.js'
+import {ExtraPayload, TransactionJSON} from '../types.js'
+import {Input} from './Input.js'
+import {Output} from './Output.js'
 import {
   addressToPublicKeyHash,
   bytesToHex,
@@ -18,15 +18,16 @@ import {
   getCompactVariableSize,
   hexToBytes
 } from '../utils.js'
-import { PrivateKey } from './PrivateKey.js'
-import { secp256k1 } from '@noble/curves/secp256k1.js'
-import { Script } from './Script.js'
+import {PrivateKey} from './PrivateKey.js'
+import {secp256k1} from '@noble/curves/secp256k1.js'
+import {Script} from './Script.js'
 import {ProRegTX} from "./ExtraPayload/ProRegTX.js";
 import {ProUpServTx} from "./ExtraPayload/ProUpServTx.js";
 import {ProUpRegTx} from "./ExtraPayload/ProUpRegTx.js";
 import {ProUpRevTx} from "./ExtraPayload/ProUpRevTx.js";
 import {CbTx} from "./ExtraPayload/CbTx.js";
 import {QcTx} from "./ExtraPayload/QcTx.js";
+import {MnHfTx} from "./ExtraPayload/MnHfTx.js";
 
 export class Transaction {
   version: number
@@ -36,7 +37,7 @@ export class Transaction {
   outputs: Output[]
   extraPayload?: ExtraPayload
 
-  constructor (inputs?: Input[], outputs?: Output[], nLockTime?: number, version?: number, type?: TransactionType, extraPayload?: ExtraPayload) {
+  constructor(inputs?: Input[], outputs?: Output[], nLockTime?: number, version?: number, type?: TransactionType, extraPayload?: ExtraPayload) {
     this.version = version ?? TRANSACTION_VERSION
     this.type = type ?? TransactionType.TRANSACTION_NORMAL
     this.#nLockTime = nLockTime ?? DEFAULT_NLOCK_TIME
@@ -45,7 +46,7 @@ export class Transaction {
     this.extraPayload = extraPayload
   }
 
-  get nLockTime (): Date | number {
+  get nLockTime(): Date | number {
     if (this.#nLockTime < NLOCK_TIME_BLOCK_BASED_LIMIT) {
       return this.#nLockTime
     } else {
@@ -53,7 +54,7 @@ export class Transaction {
     }
   }
 
-  set nLockTime (nLockTime: number | Date) {
+  set nLockTime(nLockTime: number | Date) {
     if (nLockTime instanceof Date) {
       this.#nLockTime = nLockTime.getTime()
       return
@@ -71,25 +72,25 @@ export class Transaction {
     this.#nLockTime = nLockTime
   }
 
-  addInput (inputs: Input): void {
+  addInput(inputs: Input): void {
     this.inputs.push(inputs)
   }
 
-  addOutput (output: Output): void {
+  addOutput(output: Output): void {
     this.outputs.push(output)
   }
 
-  getOutputAmount (): bigint {
+  getOutputAmount(): bigint {
     return this.outputs.reduce((acc, curr) => {
       return acc + curr.satoshis
     }, BigInt(0))
   }
 
-  hash (): string {
+  hash(): string {
     return bytesToHex(doubleSHA256(this.bytes()).toReversed())
   }
 
-  getExtraPayloadType (): keyof typeof ExtraPayloadType | undefined {
+  getExtraPayloadType(): keyof typeof ExtraPayloadType | undefined {
     switch (this.type) {
       case TransactionType.TRANSACTION_PROVIDER_REGISTER:
         return 'ProRegTx'
@@ -114,7 +115,7 @@ export class Transaction {
     return undefined
   }
 
-  #signInput (privateKey: PrivateKey, inputIndex: number): void {
+  #signInput(privateKey: PrivateKey, inputIndex: number): void {
     if (this.inputs.length < inputIndex) {
       throw new Error(`input with not found (index: ${inputIndex})`)
     }
@@ -174,13 +175,13 @@ export class Transaction {
   }
 
   // TODO: MultiSig
-  sign (privateKey: PrivateKey): void {
+  sign(privateKey: PrivateKey): void {
     for (let i = 0; i < this.inputs.length; i++) {
       this.#signInput(privateKey, i)
     }
   }
 
-  generateChange (address: string, inputAmount: bigint): void {
+  generateChange(address: string, inputAmount: bigint): void {
     if (this.inputs.length === 0) {
       throw new Error('Before call generateChange you must set all inputs')
     }
@@ -229,7 +230,7 @@ export class Transaction {
     this.outputs.push(changeOutput)
   }
 
-  bytes (): Uint8Array {
+  bytes(): Uint8Array {
     // 4 bytes version & type packed
     // varint input count
     // inputs
@@ -276,7 +277,10 @@ export class Transaction {
     const lockTimeView = new DataView(new ArrayBuffer(4))
     lockTimeView.setUint32(0, this.#nLockTime, true)
 
-    const out = new Uint8Array(versionWithTypeView.byteLength + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength)
+    const extraPayloadBytes = this.extraPayload?.bytes() ?? new Uint8Array(0)
+    const extraPayloadSizeBytes = encodeCompactSize(extraPayloadBytes.byteLength)
+
+    const out = new Uint8Array(versionWithTypeView.byteLength + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength + extraPayloadSizeBytes.byteLength + extraPayloadBytes.byteLength)
 
     out.set(new Uint8Array(versionWithTypeView.buffer), 0)
     out.set(inputCount, 4)
@@ -284,15 +288,17 @@ export class Transaction {
     out.set(outputCount, 4 + inputCount.byteLength + inputsSize)
     out.set(outputsBytes, 4 + inputCount.byteLength + inputsSize + outputCount.byteLength)
     out.set(new Uint8Array(lockTimeView.buffer), 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize)
+    out.set(extraPayloadSizeBytes, 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength)
+    out.set(extraPayloadBytes, 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength + extraPayloadSizeBytes.byteLength)
 
     return out
   }
 
-  hex (): string {
+  hex(): string {
     return bytesToHex(this.bytes())
   }
 
-  static fromBytes (bytes: Uint8Array): Transaction {
+  static fromBytes(bytes: Uint8Array): Transaction {
     // 4 bytes version & type packed
     // varint input count
     // inputs
@@ -368,6 +374,9 @@ export class Transaction {
         case TransactionType.TRANSACTION_QUORUM_COMMITMENT:
           extraPayloadHandler = QcTx.fromBytes
           break
+        case TransactionType.TRANSACTION_MASTERNODE_HARD_FORK_SIGNAL:
+          extraPayloadHandler = MnHfTx.fromBytes
+          break
         default:
           throw new Error(`Unsupported extra payload type ${type}`)
       }
@@ -378,11 +387,11 @@ export class Transaction {
     return new Transaction(inputs, outputs, nLockTime, version, type, extraPayload)
   }
 
-  static fromHex (hex: string): Transaction {
+  static fromHex(hex: string): Transaction {
     return Transaction.fromBytes(hexToBytes(hex))
   }
 
-  toJSON (): TransactionJSON {
+  toJSON(): TransactionJSON {
     return {
       version: this.version,
       type: this.type,
