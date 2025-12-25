@@ -15,8 +15,10 @@ export class OutPoint {
     const vOutView = new DataView(new ArrayBuffer(4))
     vOutView.setUint32(0, this.vOut, true)
 
-    out.set(hexToBytes(this.txId).toReversed(), 0)
-    out.set(new Uint8Array(vOutView.buffer), this.txId.length)
+    const txIdBytes = hexToBytes(this.txId)
+
+    out.set(txIdBytes.toReversed(), 0)
+    out.set(new Uint8Array(vOutView.buffer), txIdBytes.byteLength)
 
     return out
   }
