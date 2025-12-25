@@ -1,32 +1,32 @@
-import {bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes} from "../../utils.js";
-import {QfCommitJSON} from "../../types.js";
+import { bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../../utils.js'
+import { QfCommitJSON } from '../../types.js'
 
 export class QfCommit {
-  version: number;
-  llmqType: number;
-  quorumHash: string;
-  quorumIndex?: number;
-  signers: string;
-  validMembers: string;
-  quorumPublicKey: string;
-  quorumVvecHash: string;
-  quorumSig: string;
-  sig: string;
+  version: number
+  llmqType: number
+  quorumHash: string
+  quorumIndex?: number
+  signers: string
+  validMembers: string
+  quorumPublicKey: string
+  quorumVvecHash: string
+  quorumSig: string
+  sig: string
 
-  constructor(version: number, llmqType: number, quorumHash: string, signers: string, validMembers: string, quorumPublicKey: string, quorumVvecHash: string, quorumSig: string, sig: string, quorumIndex?: number) {
-    this.version = version;
-    this.llmqType = llmqType;
-    this.quorumHash = quorumHash;
-    this.quorumIndex = quorumIndex;
-    this.signers = signers;
-    this.validMembers = validMembers;
-    this.quorumPublicKey = quorumPublicKey;
-    this.quorumVvecHash = quorumVvecHash;
-    this.quorumSig = quorumSig;
-    this.sig = sig;
+  constructor (version: number, llmqType: number, quorumHash: string, signers: string, validMembers: string, quorumPublicKey: string, quorumVvecHash: string, quorumSig: string, sig: string, quorumIndex?: number) {
+    this.version = version
+    this.llmqType = llmqType
+    this.quorumHash = quorumHash
+    this.quorumIndex = quorumIndex
+    this.signers = signers
+    this.validMembers = validMembers
+    this.quorumPublicKey = quorumPublicKey
+    this.quorumVvecHash = quorumVvecHash
+    this.quorumSig = quorumSig
+    this.sig = sig
   }
 
-  static fromBytes(bytes: Uint8Array): QfCommit {
+  static fromBytes (bytes: Uint8Array): QfCommit {
     const dataView = new DataView(bytes.buffer)
 
     const version = dataView.getUint16(0, true)
@@ -64,11 +64,11 @@ export class QfCommit {
     return new QfCommit(version, llmqType, bytesToHex(quorumHash.toReversed()), bytesToHex(signers), bytesToHex(validMembers), bytesToHex(quorumPublicKey), bytesToHex(quorumVvecHash.toReversed()), bytesToHex(quorumSig), bytesToHex(sig), quorumIndex)
   }
 
-  static fromHex(hex: string): QfCommit {
+  static fromHex (hex: string): QfCommit {
     return QfCommit.fromBytes(hexToBytes(hex))
   }
 
-  bytes(): Uint8Array {
+  bytes (): Uint8Array {
     const versionBytes = new Uint8Array(2)
     const llmqTypeBytes = new Uint8Array(1)
 
@@ -80,7 +80,7 @@ export class QfCommit {
     let quorumIndexBytes = new Uint8Array(0)
 
     if (this.version >= 2) {
-      quorumIndexBytes = new Uint8Array(2);
+      quorumIndexBytes = new Uint8Array(2)
       new DataView(quorumIndexBytes.buffer).setUint16(0, this.quorumIndex ?? 0, true)
     }
 
@@ -115,11 +115,11 @@ export class QfCommit {
     return out
   }
 
-  hex(): string {
+  hex (): string {
     return bytesToHex(this.bytes())
   }
 
-  toJSON(): QfCommitJSON {
+  toJSON (): QfCommitJSON {
     return {
       version: this.version,
       llmqType: this.llmqType,
