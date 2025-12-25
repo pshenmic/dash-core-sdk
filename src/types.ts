@@ -1,11 +1,12 @@
-import { Network, TransactionType } from './constants.js'
-import { ProRegTX } from './types/ExtraPayload/ProRegTX.js'
-import { CbTx } from './types/ExtraPayload/CbTx.js'
-import { ProUpRevTx } from './types/ExtraPayload/ProUpRevTx.js'
-import { ProUpRegTx } from './types/ExtraPayload/ProUpRegTx.js'
-import { ProUpServTx } from './types/ExtraPayload/ProUpServTx.js'
-import { QcTx } from './types/ExtraPayload/QcTx.js'
-import { MnHfTx } from './types/ExtraPayload/MnHfTx.js'
+import {Network, TransactionType} from './constants.js'
+import {ProRegTX} from './types/ExtraPayload/ProRegTX.js'
+import {CbTx} from './types/ExtraPayload/CbTx.js'
+import {ProUpRevTx} from './types/ExtraPayload/ProUpRevTx.js'
+import {ProUpRegTx} from './types/ExtraPayload/ProUpRegTx.js'
+import {ProUpServTx} from './types/ExtraPayload/ProUpServTx.js'
+import {QcTx} from './types/ExtraPayload/QcTx.js'
+import {MnHfTx} from './types/ExtraPayload/MnHfTx.js'
+import {AssetLockTx} from "./types/ExtraPayload/AssetLockTx.js";
 
 export interface ScriptChunk {
   opcode: number
@@ -14,7 +15,7 @@ export interface ScriptChunk {
 
 export type NetworkLike = Network | keyof typeof Network
 
-export type ExtraPayload = ProRegTX | ProUpServTx | ProUpRegTx | ProUpRevTx | CbTx | QcTx | MnHfTx
+export type ExtraPayload = ProRegTX | ProUpServTx | ProUpRegTx | ProUpRevTx | CbTx | QcTx | MnHfTx | AssetLockTx
 
 export interface TransactionJSON {
   version: number
@@ -22,7 +23,7 @@ export interface TransactionJSON {
   nLockTime: number
   inputs: InputJSON[]
   outputs: OutputJSON[]
-  extraPayload: ProRegTxJSON | ProUpRegTxJSON | ProUpRevTxJSON | ProUpServTxJSON | CbTxJSON | QcTxJSON | MnHfTxJSON | null
+  extraPayload: ProRegTxJSON | ProUpRegTxJSON | ProUpRevTxJSON | ProUpServTxJSON | CbTxJSON | QcTxJSON | MnHfTxJSON | AssetLockTxJSON | null
 }
 
 export interface OutPointJSON {
@@ -149,6 +150,12 @@ export interface QcTxJSON {
 export interface MnHfTxJSON {
   version: number
   commitment: MnHfSignalJSON
+}
+
+export interface AssetLockTxJSON {
+  version: number
+  count: number
+  outputs: OutputJSON[]
 }
 
 export interface QfCommitJSON {

@@ -28,6 +28,7 @@ import {ProUpRevTx} from "./ExtraPayload/ProUpRevTx.js";
 import {CbTx} from "./ExtraPayload/CbTx.js";
 import {QcTx} from "./ExtraPayload/QcTx.js";
 import {MnHfTx} from "./ExtraPayload/MnHfTx.js";
+import {AssetLockTx} from "./ExtraPayload/AssetLockTx.js";
 
 export class Transaction {
   version: number
@@ -376,6 +377,9 @@ export class Transaction {
           break
         case TransactionType.TRANSACTION_MASTERNODE_HARD_FORK_SIGNAL:
           extraPayloadHandler = MnHfTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_ASSET_LOCK:
+          extraPayloadHandler = AssetLockTx.fromBytes
           break
         default:
           throw new Error(`Unsupported extra payload type ${type}`)
