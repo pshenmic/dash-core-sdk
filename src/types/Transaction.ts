@@ -29,6 +29,7 @@ import { CbTx } from './ExtraPayload/CbTx.js'
 import { QcTx } from './ExtraPayload/QcTx.js'
 import { MnHfTx } from './ExtraPayload/MnHfTx.js'
 import { AssetLockTx } from './ExtraPayload/AssetLockTx.js'
+import { AssetUnlockTx } from './ExtraPayload/AssetUnlockTx.js'
 
 export class Transaction {
   version: number
@@ -380,6 +381,9 @@ export class Transaction {
           break
         case TransactionType.TRANSACTION_ASSET_LOCK:
           extraPayloadHandler = AssetLockTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_ASSET_UNLOCK:
+          extraPayloadHandler = AssetUnlockTx.fromBytes
           break
         default:
           throw new Error(`Unsupported extra payload type ${type}`)
