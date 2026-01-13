@@ -1,0 +1,308 @@
+import { CHANGE_OUTPUT_MAX_SIZE, DEFAULT_NLOCK_TIME, FEE_PER_BYTE, MIN_FEE_RELAY, NLOCK_TIME_BLOCK_BASED_LIMIT, SIGHASH_ALL, SIGNED_INPUT_MAX_SIZE, TRANSACTION_VERSION } from '../constants.js';
+import { Input } from './Input.js';
+import { Output } from './Output.js';
+import { addressToPublicKeyHash, bytesToHex, decodeCompactSize, doubleSHA256, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../utils.js';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { Script } from './Script.js';
+import { ProRegTX } from './ExtraPayload/ProRegTX.js';
+import { ProUpServTx } from './ExtraPayload/ProUpServTx.js';
+import { ProUpRegTx } from './ExtraPayload/ProUpRegTx.js';
+import { ProUpRevTx } from './ExtraPayload/ProUpRevTx.js';
+import { CbTx } from './ExtraPayload/CbTx.js';
+import { QcTx } from './ExtraPayload/QcTx.js';
+import { MnHfTx } from './ExtraPayload/MnHfTx.js';
+import { AssetLockTx } from './ExtraPayload/AssetLockTx.js';
+import { AssetUnlockTx } from './ExtraPayload/AssetUnlockTx.js';
+export class Transaction {
+    version;
+    type;
+    #nLockTime;
+    inputs;
+    outputs;
+    extraPayload;
+    constructor(inputs, outputs, nLockTime, version, type, extraPayload) {
+        this.version = version ?? TRANSACTION_VERSION;
+        this.type = type ?? 0 /* TransactionType.TRANSACTION_NORMAL */;
+        this.#nLockTime = nLockTime ?? DEFAULT_NLOCK_TIME;
+        this.inputs = inputs ?? [];
+        this.outputs = outputs ?? [];
+        this.extraPayload = extraPayload;
+    }
+    get nLockTime() {
+        if (this.#nLockTime < NLOCK_TIME_BLOCK_BASED_LIMIT) {
+            return this.#nLockTime;
+        }
+        else {
+            return !isNaN(this.#nLockTime) ? new Date(this.#nLockTime) : this.#nLockTime;
+        }
+    }
+    set nLockTime(nLockTime) {
+        if (nLockTime instanceof Date) {
+            this.#nLockTime = nLockTime.getTime();
+            return;
+        }
+        // check for js
+        if (typeof nLockTime !== 'number') {
+            throw new Error('Invalid nLock time');
+        }
+        if (nLockTime < 0) {
+            throw new Error('nLockTime must be greater than 0');
+        }
+        this.#nLockTime = nLockTime;
+    }
+    addInput(inputs) {
+        this.inputs.push(inputs);
+    }
+    addOutput(output) {
+        this.outputs.push(output);
+    }
+    getOutputAmount() {
+        return this.outputs.reduce((acc, curr) => {
+            return acc + curr.satoshis;
+        }, BigInt(0));
+    }
+    hash() {
+        return bytesToHex(doubleSHA256(this.bytes()).toReversed());
+    }
+    getExtraPayloadType() {
+        switch (this.type) {
+            case 1 /* TransactionType.TRANSACTION_PROVIDER_REGISTER */:
+                return 'ProRegTx';
+            case 2 /* TransactionType.TRANSACTION_PROVIDER_UPDATE_SERVICE */:
+                return 'ProUpServTx';
+            case 3 /* TransactionType.TRANSACTION_PROVIDER_UPDATE_REGISTRAR */:
+                return 'ProUpRegTx';
+            case 4 /* TransactionType.TRANSACTION_PROVIDER_UPDATE_REVOKE */:
+                return 'ProUpRevTx';
+            case 5 /* TransactionType.TRANSACTION_COINBASE */:
+                return 'CbTx';
+            case 6 /* TransactionType.TRANSACTION_QUORUM_COMMITMENT */:
+                return 'QcTx';
+            case 7 /* TransactionType.TRANSACTION_MASTERNODE_HARD_FORK_SIGNAL */:
+                return 'MnHfTx';
+            case 8 /* TransactionType.TRANSACTION_ASSET_LOCK */:
+                return 'AssetLockTx';
+            case 9 /* TransactionType.TRANSACTION_ASSET_UNLOCK */:
+                return 'AssetUnlockTx';
+        }
+        return undefined;
+    }
+    #signInput(privateKey, inputIndex) {
+        if (this.inputs.length < inputIndex) {
+            throw new Error(`input with not found (index: ${inputIndex})`);
+        }
+        if (inputIndex < 0) {
+            throw new Error('inputIndex must be greater than 0');
+        }
+        const publicKey = privateKey.getPublicKey();
+        // clone inputs
+        const savedInputs = this.inputs.map(input => Input.fromBytes(input.bytes()));
+        for (let i = 0; i < this.inputs.length; i++) {
+            if (i !== inputIndex) {
+                this.inputs[i].scriptSig = new Script();
+            }
+        }
+        const txBytes = this.bytes();
+        const sighashBytes = new Uint8Array(txBytes.length + 4);
+        sighashBytes.set(txBytes, 0);
+        // push value via link to sighashBytes
+        const sighashView = new DataView(sighashBytes.buffer, txBytes.length, 4);
+        sighashView.setUint32(0, SIGHASH_ALL, true);
+        const derSignature = secp256k1.sign(doubleSHA256(sighashBytes), privateKey.key, {
+            format: 'der',
+            prehash: false,
+            lowS: true
+        });
+        const signatureWithSighash = new Uint8Array(derSignature.length + 1);
+        signatureWithSighash.set(derSignature, 0);
+        signatureWithSighash[derSignature.length] = SIGHASH_ALL;
+        const inputScript = new Script();
+        let sigOpcode;
+        if (signatureWithSighash.byteLength === 71) {
+            sigOpcode = 'OP_PUSHBYTES_71';
+        }
+        else if (signatureWithSighash.byteLength === 72) {
+            sigOpcode = 'OP_PUSHBYTES_72';
+        }
+        else if (signatureWithSighash.byteLength === 73) {
+            sigOpcode = 'OP_PUSHBYTES_73';
+        }
+        else {
+            throw new Error('Invalid signature size');
+        }
+        inputScript.pushOpCode(sigOpcode, signatureWithSighash);
+        inputScript.pushOpCode('OP_PUSHBYTES_33', publicKey.inner);
+        this.inputs = savedInputs;
+        this.inputs[inputIndex].scriptSig = inputScript;
+    }
+    // TODO: MultiSig
+    sign(privateKey) {
+        for (let i = 0; i < this.inputs.length; i++) {
+            this.#signInput(privateKey, i);
+        }
+    }
+    generateChange(address, inputAmount) {
+        if (this.inputs.length === 0) {
+            throw new Error('Before call generateChange you must set all inputs');
+        }
+        if (this.outputs.length === 0) {
+            throw new Error('Before call generateChange you must set all outputs');
+        }
+        const signedInputsSize = this.inputs.reduce((acc) => acc + BigInt(SIGNED_INPUT_MAX_SIZE), BigInt(0));
+        const outputAmount = this.outputs.reduce((acc, curr) => acc + curr.satoshis, 0n);
+        if (inputAmount < outputAmount) {
+            throw new Error('Inputs amount lower than output amount');
+        }
+        const dummyTx = Transaction.fromBytes(this.bytes());
+        dummyTx.inputs = [];
+        const txBytesLength = BigInt(dummyTx.bytes().byteLength) + signedInputsSize;
+        const outputsWithChangePrediction = outputAmount + BigInt(CHANGE_OUTPUT_MAX_SIZE) + txBytesLength;
+        let changeAmount = inputAmount - outputsWithChangePrediction * BigInt(FEE_PER_BYTE);
+        if (inputAmount === outputAmount + changeAmount) {
+            return;
+        }
+        const outputScript = new Script();
+        outputScript.pushOpCode('OP_DUP');
+        outputScript.pushOpCode('OP_HASH160');
+        outputScript.pushOpCode('OP_PUSHBYTES_20', addressToPublicKeyHash(address));
+        outputScript.pushOpCode('OP_EQUALVERIFY');
+        outputScript.pushOpCode('OP_CHECKSIG');
+        if (changeAmount < MIN_FEE_RELAY) {
+            changeAmount = BigInt(MIN_FEE_RELAY);
+        }
+        const changeOutput = new Output(changeAmount, outputScript);
+        if (inputAmount < outputAmount + BigInt(this.bytes().byteLength + changeOutput.bytes().byteLength + getCompactVariableSize(this.outputs.length + 1))) {
+            return;
+        }
+        this.outputs.push(changeOutput);
+    }
+    bytes() {
+        // 4 bytes version & type packed
+        // varint input count
+        // inputs
+        // varint output count
+        // outputs
+        // nLockTime
+        const versionWithTypeView = new DataView(new ArrayBuffer(4));
+        versionWithTypeView.setInt32(0, this.version | (this.type << 16), true);
+        const inputCount = encodeCompactSize(this.inputs.length);
+        const inputs = this.inputs.map(input => input.bytes());
+        const outputCount = encodeCompactSize(this.outputs.length);
+        const outputs = this.outputs.map(output => output.bytes());
+        const inputsSize = inputs.reduce((acc, curr) => acc + curr.byteLength, 0);
+        const outputsSize = outputs.reduce((acc, curr) => acc + curr.length, 0);
+        const inputsBytes = inputs
+            .reduce((acc, curr, currentIndex) => {
+            const previousBytesSize = inputs.slice(0, currentIndex).reduce((acc, curr) => acc + curr.byteLength, 0);
+            acc.set(curr, previousBytesSize);
+            return acc;
+        }, new Uint8Array(inputsSize));
+        const outputsBytes = outputs
+            .reduce((acc, curr, currentIndex) => {
+            const previousBytesSize = outputs.slice(0, currentIndex).reduce((acc, curr) => acc + curr.byteLength, 0);
+            acc.set(curr, previousBytesSize);
+            return acc;
+        }, new Uint8Array(outputsSize));
+        const lockTimeView = new DataView(new ArrayBuffer(4));
+        lockTimeView.setUint32(0, this.#nLockTime, true);
+        const extraPayloadBytes = this.extraPayload?.bytes() ?? new Uint8Array(0);
+        const extraPayloadSizeBytes = encodeCompactSize(extraPayloadBytes.byteLength);
+        const out = new Uint8Array(versionWithTypeView.byteLength + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength + extraPayloadSizeBytes.byteLength + extraPayloadBytes.byteLength);
+        out.set(new Uint8Array(versionWithTypeView.buffer), 0);
+        out.set(inputCount, 4);
+        out.set(inputsBytes, 4 + inputCount.byteLength);
+        out.set(outputCount, 4 + inputCount.byteLength + inputsSize);
+        out.set(outputsBytes, 4 + inputCount.byteLength + inputsSize + outputCount.byteLength);
+        out.set(new Uint8Array(lockTimeView.buffer), 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize);
+        out.set(extraPayloadSizeBytes, 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength);
+        out.set(extraPayloadBytes, 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength + extraPayloadSizeBytes.byteLength);
+        return out;
+    }
+    hex() {
+        return bytesToHex(this.bytes());
+    }
+    static fromBytes(bytes) {
+        // 4 bytes version & type packed
+        // varint input count
+        // inputs
+        // varint output count
+        // outputs
+        // nLockTime
+        const dataView = new DataView(bytes.buffer);
+        const versionWithType = dataView.getInt32(0, true);
+        const version = versionWithType & 0xffff;
+        const type = (versionWithType >> 16) & 0xffff;
+        const inputCount = decodeCompactSize(4, bytes);
+        const inputCountSize = getCompactVariableSize(inputCount);
+        const inputsPadding = 4 + inputCountSize;
+        const inputs = [];
+        for (let i = BigInt(0); i < inputCount; i++) {
+            const offset = inputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0);
+            const input = Input.fromBytes(bytes.slice(inputsPadding + offset));
+            inputs.push(input);
+        }
+        const outputCountPadding = inputs.reduce((acc, curr) => acc + curr.bytes().byteLength, inputsPadding);
+        const outputCount = decodeCompactSize(outputCountPadding, bytes);
+        const outputCountSize = getCompactVariableSize(outputCount);
+        const outputsPadding = outputCountPadding + outputCountSize;
+        const outputs = [];
+        for (let i = BigInt(0); i < outputCount; i++) {
+            const offset = outputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0);
+            const output = Output.fromBytes(bytes.slice(outputsPadding + offset));
+            outputs.push(output);
+        }
+        const lockTimePadding = outputCountPadding + outputCountSize + outputs.reduce((acc, curr) => acc + curr.bytes().byteLength, 0);
+        const nLockTime = dataView.getUint32(lockTimePadding, true);
+        let extraPayload;
+        if (lockTimePadding + 4 < bytes.length) {
+            const extraPayloadSize = decodeCompactSize(lockTimePadding + 4, bytes);
+            let extraPayloadHandler;
+            switch (type) {
+                case 1 /* TransactionType.TRANSACTION_PROVIDER_REGISTER */:
+                    extraPayloadHandler = ProRegTX.fromBytes;
+                    break;
+                case 2 /* TransactionType.TRANSACTION_PROVIDER_UPDATE_SERVICE */:
+                    extraPayloadHandler = ProUpServTx.fromBytes;
+                    break;
+                case 3 /* TransactionType.TRANSACTION_PROVIDER_UPDATE_REGISTRAR */:
+                    extraPayloadHandler = ProUpRegTx.fromBytes;
+                    break;
+                case 4 /* TransactionType.TRANSACTION_PROVIDER_UPDATE_REVOKE */:
+                    extraPayloadHandler = ProUpRevTx.fromBytes;
+                    break;
+                case 5 /* TransactionType.TRANSACTION_COINBASE */:
+                    extraPayloadHandler = CbTx.fromBytes;
+                    break;
+                case 6 /* TransactionType.TRANSACTION_QUORUM_COMMITMENT */:
+                    extraPayloadHandler = QcTx.fromBytes;
+                    break;
+                case 7 /* TransactionType.TRANSACTION_MASTERNODE_HARD_FORK_SIGNAL */:
+                    extraPayloadHandler = MnHfTx.fromBytes;
+                    break;
+                case 8 /* TransactionType.TRANSACTION_ASSET_LOCK */:
+                    extraPayloadHandler = AssetLockTx.fromBytes;
+                    break;
+                case 9 /* TransactionType.TRANSACTION_ASSET_UNLOCK */:
+                    extraPayloadHandler = AssetUnlockTx.fromBytes;
+                    break;
+                default:
+                    throw new Error(`Unsupported extra payload type ${type}`);
+            }
+            extraPayload = extraPayloadHandler(bytes.slice(lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize), lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize) + Number(extraPayloadSize)));
+        }
+        return new Transaction(inputs, outputs, nLockTime, version, type, extraPayload);
+    }
+    static fromHex(hex) {
+        return Transaction.fromBytes(hexToBytes(hex));
+    }
+    toJSON() {
+        return {
+            version: this.version,
+            type: this.type,
+            nLockTime: this.#nLockTime,
+            outputs: this.outputs.map(output => output.toJSON()),
+            inputs: this.inputs.map(input => input.toJSON()),
+            extraPayload: this.extraPayload?.toJSON() ?? null
+        };
+    }
+}

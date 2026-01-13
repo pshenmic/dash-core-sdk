@@ -1,0 +1,16 @@
+import { Network } from './constants.js';
+import { NetworkLike } from './types.js';
+export declare function getRandomArrayItem(array: any[]): any;
+export declare function hexToBytes(hex: string): Uint8Array;
+export declare function bytesToHex(bytes: Uint8Array): string;
+export declare function decodeCompactSize(offset: number, bytes: Uint8Array): number | bigint;
+export declare function encodeCompactSize(num: number | bigint): Uint8Array;
+export declare function getCompactVariableSize(num: number | bigint): number;
+export declare function wait(ms: number): Promise<void>;
+export declare function doubleSHA256(data: Uint8Array): Uint8Array;
+export declare function SHA256RIPEMD160(data: Uint8Array): Uint8Array;
+export declare function networkValueToEnumValue(value: Network | keyof typeof Network): Network;
+export declare function addressToPublicKeyHash(address: string): Uint8Array;
+export declare function publicKeyHashToAddress(hash: Uint8Array, network?: NetworkLike): string;
+export declare function bytesToIp(bytes: Uint8Array): string;
+export declare function ipToBytes(ip: string, compact?: boolean): Uint8Array;
