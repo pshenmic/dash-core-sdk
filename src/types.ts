@@ -22,6 +22,12 @@ export interface InstantLockJSON {
   signature: string
 }
 
+export interface BlockJSON {
+  blockHeader: BlockHeaderJSON
+  txCount: number
+  txs: TransactionJSON[]
+}
+
 export interface BlockHeaderJSON {
   version: number
   previousBlockHash: string
