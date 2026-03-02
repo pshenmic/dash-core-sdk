@@ -27,12 +27,12 @@ export class Transaction {
 
   // TODO: payload
 
-  constructor (inputs: Input[], outputs: Output[], nLockTime: number, version: number, type: TransactionType, extraPayload?: Uint8Array) {
+  constructor (inputs?: Input[], outputs?: Output[], nLockTime?: number, version?: number, type?: TransactionType, extraPayload?: Uint8Array) {
     this.version = version ?? TRANSACTION_VERSION
     this.type = type ?? TransactionType.TRANSACTION_NORMAL
     this.#nLockTime = nLockTime ?? DEFAULT_NLOCK_TIME
-    this.inputs = inputs
-    this.outputs = outputs
+    this.inputs = inputs ?? []
+    this.outputs = outputs ?? []
     this.extraPayload = extraPayload
   }
 
