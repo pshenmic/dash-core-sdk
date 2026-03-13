@@ -6,7 +6,7 @@ import {
   TRANSACTION_VERSION,
   TransactionType
 } from '../constants.js'
-import { TransactionJSON } from '../types.js'
+import { ExtraPayload, TransactionJSON } from '../types.js'
 import { Input } from './Input.js'
 import { Output } from './Output.js'
 import {
@@ -21,6 +21,15 @@ import {
 import { PrivateKey } from './PrivateKey.js'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { Script } from './Script.js'
+import { ProRegTX } from './ExtraPayload/ProRegTX.js'
+import { ProUpServTx } from './ExtraPayload/ProUpServTx.js'
+import { ProUpRegTx } from './ExtraPayload/ProUpRegTx.js'
+import { ProUpRevTx } from './ExtraPayload/ProUpRevTx.js'
+import { CbTx } from './ExtraPayload/CbTx.js'
+import { QcTx } from './ExtraPayload/QcTx.js'
+import { MnHfTx } from './ExtraPayload/MnHfTx.js'
+import { AssetLockTx } from './ExtraPayload/AssetLockTx.js'
+import { AssetUnlockTx } from './ExtraPayload/AssetUnlockTx.js'
 
 export class Transaction {
   version: number
@@ -28,9 +37,9 @@ export class Transaction {
   #nLockTime: number
   inputs: Input[]
   outputs: Output[]
-  extraPayload?: Uint8Array
+  extraPayload?: ExtraPayload
 
-  constructor (inputs?: Input[], outputs?: Output[], nLockTime?: number, version?: number, type?: TransactionType, extraPayload?: Uint8Array) {
+  constructor (inputs?: Input[], outputs?: Output[], nLockTime?: number, version?: number, type?: TransactionType, extraPayload?: ExtraPayload) {
     this.version = version ?? TRANSACTION_VERSION
     this.type = type ?? TransactionType.TRANSACTION_NORMAL
     this.#nLockTime = nLockTime ?? DEFAULT_NLOCK_TIME
@@ -270,7 +279,10 @@ export class Transaction {
     const lockTimeView = new DataView(new ArrayBuffer(4))
     lockTimeView.setUint32(0, this.#nLockTime, true)
 
-    const out = new Uint8Array(versionWithTypeView.byteLength + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength)
+    const extraPayloadBytes = this.extraPayload?.bytes() ?? new Uint8Array(0)
+    const extraPayloadSizeBytes = encodeCompactSize(extraPayloadBytes.byteLength)
+
+    const out = new Uint8Array(versionWithTypeView.byteLength + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength + extraPayloadSizeBytes.byteLength + extraPayloadBytes.byteLength)
 
     out.set(new Uint8Array(versionWithTypeView.buffer), 0)
     out.set(inputCount, 4)
@@ -278,6 +290,8 @@ export class Transaction {
     out.set(outputCount, 4 + inputCount.byteLength + inputsSize)
     out.set(outputsBytes, 4 + inputCount.byteLength + inputsSize + outputCount.byteLength)
     out.set(new Uint8Array(lockTimeView.buffer), 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize)
+    out.set(extraPayloadSizeBytes, 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength)
+    out.set(extraPayloadBytes, 4 + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength + extraPayloadSizeBytes.byteLength)
 
     return out
   }
@@ -336,12 +350,46 @@ export class Transaction {
 
     const nLockTime = dataView.getUint32(lockTimePadding, true)
 
-    let extraPayload: Uint8Array | undefined
+    let extraPayload: ExtraPayload | undefined
 
     if (lockTimePadding + 4 < bytes.length) {
       const extraPayloadSize = decodeCompactSize(lockTimePadding + 4, bytes)
 
-      extraPayload = bytes.slice(lockTimePadding + 4, lockTimePadding + 4 + Number(extraPayloadSize))
+      let extraPayloadHandler: Function
+
+      switch (type) {
+        case TransactionType.TRANSACTION_PROVIDER_REGISTER:
+          extraPayloadHandler = ProRegTX.fromBytes
+          break
+        case TransactionType.TRANSACTION_PROVIDER_UPDATE_SERVICE:
+          extraPayloadHandler = ProUpServTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_PROVIDER_UPDATE_REGISTRAR:
+          extraPayloadHandler = ProUpRegTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_PROVIDER_UPDATE_REVOKE:
+          extraPayloadHandler = ProUpRevTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_COINBASE:
+          extraPayloadHandler = CbTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_QUORUM_COMMITMENT:
+          extraPayloadHandler = QcTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_MASTERNODE_HARD_FORK_SIGNAL:
+          extraPayloadHandler = MnHfTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_ASSET_LOCK:
+          extraPayloadHandler = AssetLockTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_ASSET_UNLOCK:
+          extraPayloadHandler = AssetUnlockTx.fromBytes
+          break
+        default:
+          throw new Error(`Unsupported extra payload type ${type}`)
+      }
+
+      extraPayload = extraPayloadHandler(bytes.slice(lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize), lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize) + Number(extraPayloadSize)))
     }
 
     return new Transaction(inputs, outputs, nLockTime, version, type, extraPayload)
@@ -358,7 +406,7 @@ export class Transaction {
       nLockTime: this.#nLockTime,
       outputs: this.outputs.map(output => output.toJSON()),
       inputs: this.inputs.map(input => input.toJSON()),
-      extraPayload: this.extraPayload != null ? bytesToHex(this.extraPayload) : null
+      extraPayload: this.extraPayload?.toJSON() ?? null
     }
   }
 }
