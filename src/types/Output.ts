@@ -1,5 +1,6 @@
 import { Script } from './Script.js'
 import {
+  addressToPublicKeyHash,
   bytesToHex,
   decodeCompactSize,
   encodeCompactSize,
@@ -14,9 +15,9 @@ export class Output {
   satoshis: bigint
   script: Script
 
-  constructor (satoshis: bigint, script: Script) {
+  constructor (satoshis: bigint, script?: Script) {
     this.satoshis = satoshis
-    this.script = script
+    this.script = script ?? new Script()
   }
 
   static fromBytes (bytes: Uint8Array): Output {
@@ -56,6 +57,18 @@ export class Output {
 
   hex (): string {
     return bytesToHex(this.bytes())
+  }
+
+  generateP2PKH (address: string): void {
+    const script = new Script()
+
+    script.pushOpCode('OP_DUP')
+    script.pushOpCode('OP_HASH160')
+    script.pushOpCode('OP_PUSHBYTES_20', addressToPublicKeyHash(address))
+    script.pushOpCode('OP_EQUALVERIFY')
+    script.pushOpCode('OP_CHECKSIG')
+
+    this.script = script
   }
 
   getAddress (network: NetworkLike = DEFAULT_NETWORK): string | undefined {
