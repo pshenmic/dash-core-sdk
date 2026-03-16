@@ -1,8 +1,9 @@
 import { DEFAULT_NETWORK, Network, PubKeyHashAddressNetworkPrefix } from './constants.js'
 import { sha256 as Sha256 } from 'sha.js'
-import Ripemd160 from 'ripemd160'
+import Ripemd160 = require('ripemd160')
 import { Base58Check } from './base58check.js'
 import { NetworkLike } from './types.js'
+
 
 export function getRandomArrayItem (array: any[]): any {
   return array[Math.floor((Math.random() * array.length))]
