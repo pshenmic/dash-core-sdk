@@ -53,7 +53,8 @@ export class Block {
         return {
             blockHeader: this.blockHeader.toJSON(),
             txCount: this.txCount,
-            txs: this.txs.map(tx => tx.toJSON())
+            txs: this.txs.map(tx => tx.toJSON()),
+            hash: this.hash()
         };
     }
 }

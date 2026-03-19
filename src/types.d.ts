@@ -20,6 +20,7 @@ export interface TransactionJSON {
     nLockTime: number;
     inputs: InputJSON[];
     outputs: OutputJSON[];
+    hash: string;
     extraPayload: ProRegTxJSON | ProUpRegTxJSON | ProUpRevTxJSON | ProUpServTxJSON | CbTxJSON | QcTxJSON | MnHfTxJSON | AssetLockTxJSON | AssetUnlockTxJSON | null;
 }
 export interface OutPointJSON {
@@ -37,6 +38,7 @@ export interface BlockJSON {
     blockHeader: BlockHeaderJSON;
     txCount: number;
     txs: TransactionJSON[];
+    hash: string;
 }
 export interface BlockHeaderJSON {
     version: number;
