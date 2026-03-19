@@ -27,17 +27,17 @@ import { PrivateKey } from './types/PrivateKey.js'
 import { Transaction } from './types/Transaction.js'
 import { InstantLock } from './types/InstantLock.js'
 import type { ServerStreamingCall } from '@protobuf-ts/runtime-rpc'
-import {AssetLockTx} from "./types/ExtraPayload/AssetLockTx.js"
-import {AssetUnlockTx} from "./types/ExtraPayload/AssetUnlockTx.js"
-import {CbTx} from "./types/ExtraPayload/CbTx.js"
-import {MnHfTx} from "./types/ExtraPayload/MnHfTx.js"
-import {ProRegTX} from "./types/ExtraPayload/ProRegTX.js"
-import {ProUpRegTx} from "./types/ExtraPayload/ProUpRegTx.js"
-import {ProUpRevTx} from "./types/ExtraPayload/ProUpRevTx.js"
-import {ProUpServTx} from "./types/ExtraPayload/ProUpServTx.js"
-import {QcTx} from "./types/ExtraPayload/QcTx.js"
-import {MnHfSignal} from "./types/Messages/MnHfSignal.js"
-import {QfCommit} from "./types/Messages/QfCommit.js"
+import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
+import { AssetUnlockTx } from './types/ExtraPayload/AssetUnlockTx.js'
+import { CbTx } from './types/ExtraPayload/CbTx.js'
+import { MnHfTx } from './types/ExtraPayload/MnHfTx.js'
+import { ProRegTX } from './types/ExtraPayload/ProRegTX.js'
+import { ProUpRegTx } from './types/ExtraPayload/ProUpRegTx.js'
+import { ProUpRevTx } from './types/ExtraPayload/ProUpRevTx.js'
+import { ProUpServTx } from './types/ExtraPayload/ProUpServTx.js'
+import { QcTx } from './types/ExtraPayload/QcTx.js'
+import { MnHfSignal } from './types/Messages/MnHfSignal.js'
+import { QfCommit } from './types/Messages/QfCommit.js'
 
 interface DapiTransaction {
   transaction: Uint8Array
@@ -73,18 +73,18 @@ export interface CoreKeyPair {
   wif: string
 }
 
-export {BlockHeader} from "./types/BlockHeader.js"
-export {BloomFilterWriter} from "./types/BloomFilter.js"
-export {Input} from "./types/Input.js"
-export {InstantLock} from "./types/InstantLock.js"
-export {MerkleBlock} from "./types/MerkleBlock.js"
-export {MerkleTree} from "./types/MerkleTree.js"
-export {OutPoint} from "./types/OutPoint.js"
-export {Output} from "./types/Output.js"
-export {PrivateKey} from "./types/PrivateKey.js"
-export {PublicKey} from "./types/PublicKey.js"
-export {Script} from "./types/Script.js"
-export {Transaction} from "./types/Transaction.js"
+export { BlockHeader } from './types/BlockHeader.js'
+export { BloomFilterWriter } from './types/BloomFilter.js'
+export { Input } from './types/Input.js'
+export { InstantLock } from './types/InstantLock.js'
+export { MerkleBlock } from './types/MerkleBlock.js'
+export { MerkleTree } from './types/MerkleTree.js'
+export { OutPoint } from './types/OutPoint.js'
+export { Output } from './types/Output.js'
+export { PrivateKey } from './types/PrivateKey.js'
+export { PublicKey } from './types/PublicKey.js'
+export { Script } from './types/Script.js'
+export { Transaction } from './types/Transaction.js'
 
 const extraPayload = {
   AssetLockTx,
@@ -103,9 +103,8 @@ const messages = {
   QfCommit
 }
 
-export {messages as Messages}
-export {extraPayload as ExtraPayload}
-
+export { messages as Messages }
+export { extraPayload as ExtraPayload }
 
 export class DashCoreSDK {
   grpcConnectionPool: GRPCConnectionPool

@@ -2,7 +2,7 @@ import { DEFAULT_NETWORK, Network, PubKeyHashAddressNetworkPrefix } from './cons
 import { sha256 } from '@noble/hashes/sha2.js'
 import { ripemd160 } from '@noble/hashes/legacy.js'
 import { Base58Check } from './base58check.js'
-import {NetworkLike} from "./types.js";
+import { NetworkLike } from './types.js'
 
 export function getRandomArrayItem (array: any[]): any {
   return array[Math.floor((Math.random() * array.length))]
@@ -204,4 +204,3 @@ export function ipToBytes (ip: string, compact?: boolean): Uint8Array {
 
   throw new Error('Invalid IP address format')
 }
-

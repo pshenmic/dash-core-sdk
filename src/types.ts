@@ -211,5 +211,3 @@ export interface MnHfSignalJSON {
   quorumHash: string
   sig: string
 }
-
-export type NetworkLike = Network | keyof typeof Network
