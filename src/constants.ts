@@ -4,8 +4,20 @@ export const DASH_VERSIONS = {
   mainnet: { pubKeyHash: 0x4c, scriptHash: 0x10, bech32: 'dc', wif: 0xcc, private: 0x0488ade4, public: 0x0488b21e },
   testnet: { pubKeyHash: 0x8c, scriptHash: 0x13, bech32: 'dc', wif: 0xef, private: 0x04358394, public: 0x043587cf }
 }
-export const DUST_AMOUNT = 5460
-export const FEE_PER_KB = 1000
+
+export const FEE_PER_BYTE = 1
+export const MIN_FEE_RELAY = 1000
+
+export const SIGHASH_ALL = 0x01
+
+/**
+ * 32 - txId size
+ * 4 - vout size
+ * 8 - max scriptSigSize size
+ * 108 - max scripSig size (SIG + PubKey Inner)
+ * 4 - sequence
+ */
+export const SIGNED_INPUT_MAX_SIZE = 32 + 4 + 8 + 108 + 4
 
 /**
  * 20 P2SH bytes
@@ -15,14 +27,6 @@ export const FEE_PER_KB = 1000
  * total: 62 bytes
  */
 export const CHANGE_OUTPUT_MAX_SIZE = 20 + 4 + 34 + 4
-
-/**
- * 4 version bytes
- * 9 input count bytes
- * 9 output count bytes
- * 4 lock time bytes
- */
-export const MAXIMUM_EXTRA_SIZE = 4 + 9 + 9 + 4
 
 export const enum TransactionType {
   TRANSACTION_NORMAL = 0,
@@ -357,7 +361,7 @@ export enum NetworkPrefix {
 
 export const PubKeyHashAddressNetworkPrefix = {
   [Network.Mainnet]: NetworkPrefix.PubkeyPrefixMainnet,
-  [Network.Testnet]: NetworkPrefix.PubkeyPrefixTestnet,
+  [Network.Testnet]: NetworkPrefix.PubkeyPrefixTestnet
 }
 
 export const DEFAULT_NETWORK = Network.Testnet
