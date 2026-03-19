@@ -1,0 +1,63 @@
+import { Script } from './Script.js';
+import { addressToPublicKeyHash, bytesToHex, decodeCompactSize, encodeCompactSize, getCompactVariableSize, hexToBytes, networkValueToEnumValue } from '../utils.js';
+import { DEFAULT_NETWORK, OPCODES } from '../constants.js';
+export class Output {
+    satoshis;
+    script;
+    constructor(satoshis, script) {
+        this.satoshis = satoshis;
+        this.script = script ?? new Script();
+    }
+    static fromBytes(bytes) {
+        const properties = new DataView(bytes.buffer);
+        const satoshis = properties.getBigUint64(0, true);
+        const scriptSize = decodeCompactSize(8, bytes);
+        const scriptPadding = 8 + getCompactVariableSize(scriptSize);
+        const script = new Script(new Uint8Array(properties.buffer.slice(scriptPadding, scriptPadding + Number(scriptSize))));
+        return new Output(satoshis, script);
+    }
+    static fromHex(hex) {
+        return Output.fromBytes(hexToBytes(hex));
+    }
+    bytes() {
+        const scriptBytes = this.script.bytes();
+        const scriptSize = encodeCompactSize(scriptBytes.byteLength);
+        const dataView = new DataView(new ArrayBuffer(8));
+        dataView.setBigUint64(0, this.satoshis, true);
+        const bytes = new Uint8Array(dataView.byteLength + scriptBytes.byteLength + getCompactVariableSize(scriptBytes.byteLength));
+        bytes.set(new Uint8Array(dataView.buffer), 0);
+        bytes.set(scriptSize, dataView.buffer.byteLength);
+        bytes.set(scriptBytes, dataView.byteLength + scriptSize.byteLength);
+        return bytes;
+    }
+    hex() {
+        return bytesToHex(this.bytes());
+    }
+    generateP2PKH(address) {
+        const script = new Script();
+        script.pushOpCode('OP_DUP');
+        script.pushOpCode('OP_HASH160');
+        script.pushOpCode('OP_PUSHBYTES_20', addressToPublicKeyHash(address));
+        script.pushOpCode('OP_EQUALVERIFY');
+        script.pushOpCode('OP_CHECKSIG');
+        this.script = script;
+    }
+    getAddress(network = DEFAULT_NETWORK) {
+        const normalNetwork = networkValueToEnumValue(network);
+        if (normalNetwork > 255) {
+            throw new Error('Network prefix cannot be more than 255');
+        }
+        // TODO: add other codes
+        const cryptoOpCodes = [OPCODES.OP_HASH160];
+        const cryptoOpcodeIndex = this.script.parsedScriptChunks.findIndex(chunk => cryptoOpCodes.includes(chunk.opcode));
+        if (cryptoOpcodeIndex === -1) {
+            return undefined;
+        }
+    }
+    toJSON() {
+        return {
+            satoshis: String(this.satoshis),
+            script: this.script.ASMString()
+        };
+    }
+}
