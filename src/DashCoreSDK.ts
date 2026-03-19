@@ -106,11 +106,12 @@ const messages = {
 export {messages as Messages}
 export {extraPayload as ExtraPayload}
 
+
 export class DashCoreSDK {
   grpcConnectionPool: GRPCConnectionPool
 
-  constructor () {
-    this.grpcConnectionPool = new GRPCConnectionPool('testnet', { dapiUrl: 'http://127.0.0.1:1443', poolLimit: 5 })
+  constructor (dapiUrl = 'https://127.0.0.1:1443') {
+    this.grpcConnectionPool = new GRPCConnectionPool('testnet', { dapiUrl, poolLimit: 5 })
   }
 
   async generateAddress (): Promise<CoreKeyPair> {
