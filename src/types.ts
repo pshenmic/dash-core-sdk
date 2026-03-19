@@ -33,6 +33,7 @@ export interface TransactionJSON {
   nLockTime: number
   inputs: InputJSON[]
   outputs: OutputJSON[]
+  hash: string
   extraPayload: ProRegTxJSON
   | ProUpRegTxJSON
   | ProUpRevTxJSON
@@ -61,7 +62,8 @@ export interface InstantLockJSON {
 export interface BlockJSON {
   blockHeader: BlockHeaderJSON
   txCount: number
-  txs: TransactionJSON[]
+  txs: TransactionJSON[],
+  hash: string
 }
 
 export interface BlockHeaderJSON {
