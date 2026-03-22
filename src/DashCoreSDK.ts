@@ -36,10 +36,12 @@ interface DapiTransaction {
   isInstantLocked: boolean
   isChainLocked: boolean
 }
+
 export interface SubscribeToTransactionsEvent {
   event: 'rawMerkleBlock' | 'rawTransaction' | 'instantSendLockMessage'
   data: string
 }
+
 interface BlockRequest {
   hash?: string
   height?: number
@@ -51,6 +53,7 @@ export interface BloomFilter {
   nTweak: number
   nFlags: number
 }
+
 export interface PaymentInfo {
   txid: string
   chainLocked?: number
@@ -61,19 +64,30 @@ export interface CoreKeyPair {
   address: string
   wif: string
 }
+
 export class DashCoreSDK {
   grpcConnectionPool: GRPCConnectionPool
+  network: 'mainnet' | 'testnet'
 
-  constructor () {
-    this.grpcConnectionPool = new GRPCConnectionPool('testnet', { dapiUrl: 'http://127.0.0.1:1443', poolLimit: 5 })
+  constructor (options: { network?: 'mainnet' | 'testnet', dapiUrl?: string, poolLimit?: number } = {}) {
+    this.network = options.network ?? 'testnet'
+    this.grpcConnectionPool = new GRPCConnectionPool(this.network, {
+      dapiUrl: options.dapiUrl ?? (this.network === 'mainnet' ? 'http://127.0.0.1:443' : 'http://127.0.0.1:1443'),
+      poolLimit: options.poolLimit ?? 5
+    })
+  }
+
+  private getNetworkType (): Network {
+    return this.network === 'mainnet' ? Network.Mainnet : Network.Testnet
   }
 
   async generateAddress (): Promise<CoreKeyPair> {
     const { secretKey, publicKey } = secp.keygen()
-    const P2PKH = p2pkh(publicKey, DASH_VERSIONS.testnet)
+    const networkType = this.getNetworkType()
+    const P2PKH = p2pkh(publicKey, DASH_VERSIONS[this.network])
 
     return {
-      wif: PrivateKey.fromBytes(secretKey, Network.Testnet).toWIF(),
+      wif: PrivateKey.fromBytes(secretKey, networkType).toWIF(),
       address: P2PKH.address
     }
   }
@@ -169,7 +183,7 @@ export class DashCoreSDK {
             if (dapiTransaction.isChainLocked && pendingTransaction.hash === transaction.hash && pendingTransaction.outputs
               .some(output => output.satoshis >= amount &&
                     // @ts-expect-error
-                    output.script.toAddress('testnet').toString() === address)) {
+                    output.script.toAddress(this.network).toString() === address)) {
               return {
                 txid: transaction.hash(),
                 chainLocked: dapiTransaction.height
@@ -194,7 +208,7 @@ export class DashCoreSDK {
                 pendingTransaction.outputs
                   .some(output => output.satoshis >= amount &&
                         // @ts-expect-error
-                        output.script.toAddress('testnet').toString() === address)) {
+                        output.script.toAddress(this.network).toString() === address)) {
               return {
                 txid: instantSendLock.txId,
                 instantLocked: event.data
@@ -248,7 +262,7 @@ export class DashCoreSDK {
           case 'rawTransactions': {
             for (const transaction of responses.rawTransactions.transactions) {
               const tx = Transaction.fromBytes(transaction)
-              if (tx.outputs.some((output) => output.getAddress(Network.Testnet))) {
+              if (tx.outputs.some((output) => output.getAddress(this.getNetworkType()))) {
                 yield ({
                   event: 'rawTransaction',
                   data: bytesToHex(transaction)
