@@ -180,10 +180,15 @@ export class DashCoreSDK {
             const dapiTransaction = await this.getTransaction(pendingTransaction.hash())
             const transaction = Transaction.fromBytes(dapiTransaction.transaction)
 
-            if (dapiTransaction.isChainLocked && pendingTransaction.hash === transaction.hash && pendingTransaction.outputs
-              .some(output => output.satoshis >= amount &&
-                    // @ts-expect-error
-                    output.script.toAddress(this.network).toString() === address)) {
+            if (
+              dapiTransaction.isChainLocked &&
+              pendingTransaction.hash() === transaction.hash() &&
+              pendingTransaction.outputs.some(output =>
+                output.satoshis >= amount &&
+                // @ts-expect-error
+                output.script.toAddress(this.network).toString() === address
+              )
+            ) {
               return {
                 txid: transaction.hash(),
                 chainLocked: dapiTransaction.height
@@ -193,9 +198,9 @@ export class DashCoreSDK {
           break
         }
         case 'rawTransaction': {
-          const tx = event.data
-          if (!pendingTransactions.some(tx => tx.hash)) {
-            const transaction = Transaction.fromBytes(hexToBytes(tx))
+          const rawTx = event.data
+          const transaction = Transaction.fromBytes(hexToBytes(rawTx))
+          if (!pendingTransactions.some((pendingTx) => pendingTx.hash() === transaction.hash())) {
             pendingTransactions.push(transaction)
           }
           break
