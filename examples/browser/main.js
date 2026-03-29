@@ -1,10 +1,13 @@
-import { DashCoreSDK } from '../../dist/index.js'
+import { DashCoreSDK } from '../../dist/browser.js'
 
 const output = document.getElementById('output')
 const networkSelect = document.getElementById('network')
 const dapiUrlInput = document.getElementById('dapi-url')
+const paymentAddressInput = document.getElementById('payment-address')
+const paymentAmountInput = document.getElementById('payment-amount')
 const generateButton = document.getElementById('generate-address')
 const checkStatusButton = document.getElementById('check-status')
+const waitForPaymentButton = document.getElementById('wait-for-payment')
 
 const log = (label, value) => {
   const rendered = typeof value === 'string' ? value : JSON.stringify(value, null, 2)
@@ -19,6 +22,16 @@ const buildSdk = () => {
   })
 }
 
+const getPaymentAmount = () => {
+  const amount = Number(paymentAmountInput.value.trim())
+
+  if (!Number.isSafeInteger(amount) || amount < 0) {
+    throw new Error('Amount must be a non-negative integer in satoshis')
+  }
+
+  return amount
+}
+
 generateButton.addEventListener('click', async () => {
   generateButton.disabled = true
   log('Generating address...', '')
@@ -26,6 +39,7 @@ generateButton.addEventListener('click', async () => {
   try {
     const sdk = buildSdk()
     const keyPair = await sdk.generateAddress()
+    paymentAddressInput.value = keyPair.address
     log('Generated address', keyPair)
   } catch (error) {
     log('Address generation failed', {
@@ -60,5 +74,42 @@ checkStatusButton.addEventListener('click', async () => {
     })
   } finally {
     checkStatusButton.disabled = false
+  }
+})
+
+waitForPaymentButton.addEventListener('click', async () => {
+  waitForPaymentButton.disabled = true
+
+  try {
+    const address = paymentAddressInput.value.trim()
+    const amountSatoshis = getPaymentAmount()
+
+    if (address.length === 0) {
+      throw new Error('Address is required')
+    }
+
+    const sdk = buildSdk()
+
+    log('Waiting for payment...', {
+      dapiUrl: dapiUrlInput.value.trim(),
+      network: networkSelect.value,
+      address,
+      amountSatoshis,
+      note: 'waitForPayment listens only for new payment events after start'
+    })
+
+    const payment = await sdk.waitForPayment(address, amountSatoshis)
+
+    log('Payment detected', payment)
+  } catch (error) {
+    log('waitForPayment failed', {
+      dapiUrl: dapiUrlInput.value.trim(),
+      network: networkSelect.value,
+      address: paymentAddressInput.value.trim(),
+      amountSatoshis: paymentAmountInput.value.trim(),
+      message: error instanceof Error ? error.message : String(error)
+    })
+  } finally {
+    waitForPaymentButton.disabled = false
   }
 })

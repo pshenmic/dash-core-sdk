@@ -5,9 +5,9 @@
 From the repository root:
 
 ```bash
-npm install
-npm run build:grpc
-npm run build
+yarn install
+yarn build:grpc
+yarn build
 ```
 
 ## Node
@@ -48,11 +48,10 @@ http://127.0.0.1:4173/examples/browser/
 What it does:
 
 - imports the built SDK from `dist/`
-- uses `importmap` with `esm.sh` for npm dependencies
+- imports the bundled browser build from `dist/browser.js`
 - generates an address in the browser
 - optionally performs a blockchain status smoke check against the selected DAPI URL
 
 Notes:
 
-- the browser example requires internet access to load dependencies from `esm.sh`
 - network calls may still fail if the selected DAPI endpoint does not allow browser grpc-web/CORS requests

@@ -110,31 +110,14 @@
         word-break: break-word;
       }
     </style>
-    <script type="importmap">
-      {
-        "imports": {
-          "@protobuf-ts/grpcweb-transport": "https://esm.sh/@protobuf-ts/grpcweb-transport@2.11.1?bundle",
-          "@protobuf-ts/runtime-rpc": "https://esm.sh/@protobuf-ts/runtime-rpc@2.11.1?bundle",
-          "@protobuf-ts/runtime": "https://esm.sh/@protobuf-ts/runtime@2.11.1?bundle",
-          "@scure/base": "https://esm.sh/@scure/base@2.0.0?bundle",
-          "@scure/btc-signer": "https://esm.sh/@scure/btc-signer@2.0.1?bundle",
-          "@noble/secp256k1": "https://esm.sh/@noble/secp256k1@3.0.0?bundle",
-          "@noble/curves/secp256k1.js": "https://esm.sh/@noble/curves@2.0.1/secp256k1?bundle",
-          "@dashevo/x11-hash-js": "https://esm.sh/@dashevo/x11-hash-js@1.0.2?bundle",
-          "@noble/hashes/legacy.js": "https://esm.sh/@noble/hashes@2.0.1/legacy.js?bundle",
-          "bloom-filter": "https://esm.sh/bloom-filter@0.2.0?bundle",
-          "ripemd160": "https://esm.sh/ripemd160@2.0.3?bundle",
-          "sha.js": "https://esm.sh/sha.js@2.4.12?bundle"
-        }
-      }
-    </script>
   </head>
   <body>
     <main>
       <h1>dash-core-sdk in the browser</h1>
       <p>
-        This example uses the built SDK from <code>dist/</code>. Start a local static server from the repository root
-        after <code>npm run build:grpc</code> and <code>npm run build</code>, then open <code>/examples/browser/</code>.
+        This example uses the bundled browser build from <code>dist/browser.js</code>. Start a local static server from
+        the repository root after <code>yarn build:grpc</code> and <code>yarn build</code>, then open
+        <code>/examples/browser/</code>.
       </p>
 
       <div class="controls">
@@ -152,9 +135,22 @@
         </label>
       </div>
 
+      <div class="controls">
+        <label>
+          Payment Address
+          <input id="payment-address" placeholder="Enter a Dash address to watch" />
+        </label>
+
+        <label>
+          Amount (satoshis)
+          <input id="payment-amount" type="number" min="0" step="1" value="1000" />
+        </label>
+      </div>
+
       <div class="actions">
         <button id="generate-address">Generate Address</button>
         <button id="check-status" class="secondary">Check Blockchain Status</button>
+        <button id="wait-for-payment">Wait For Payment</button>
       </div>
 
       <pre id="output">Ready.</pre>
