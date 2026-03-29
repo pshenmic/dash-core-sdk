@@ -17,15 +17,15 @@ import {
   MasternodeListRequest, type MasternodeListResponse,
   TransactionsWithProofsRequest, type TransactionsWithProofsResponse
 } from '../proto/generated/core.js'
-import { base58 } from '@scure/base'
 import bloomFilter from 'bloom-filter'
 import { BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, Network } from './constants.js'
-import { bytesToHex, hexToBytes, wait } from './utils.js'
+import { addressToPublicKeyHash, bytesToHex, hexToBytes, wait } from './utils.js'
 import { p2pkh } from '@scure/btc-signer'
 import * as secp from '@noble/secp256k1'
 import { PrivateKey } from './types/PrivateKey.js'
 import { Transaction } from './types/Transaction.js'
 import { InstantLock } from './types/InstantLock.js'
+import { Output } from './types/Output.js'
 import type { ServerStreamingCall } from '@protobuf-ts/runtime-rpc'
 import {AssetLockTx} from "./types/ExtraPayload/AssetLockTx.js"
 import {AssetUnlockTx} from "./types/ExtraPayload/AssetUnlockTx.js"
@@ -126,6 +126,58 @@ export class DashCoreSDK {
     return this.network === 'mainnet' ? Network.Mainnet : Network.Testnet
   }
 
+  private getPaymentAmount (amount: number): bigint {
+    if (!Number.isSafeInteger(amount) || amount < 0) {
+      throw new Error('Amount must be a non-negative safe integer')
+    }
+
+    return BigInt(amount)
+  }
+
+  private getOutputAddress (output: Output): string | undefined {
+    return output.script.getAddress(this.getNetworkType())
+  }
+
+  private outputMatchesPayment (output: Output, address: string, amount: bigint): boolean {
+    return output.satoshis >= amount && this.getOutputAddress(output) === address
+  }
+
+  private transactionMatchesPayment (transaction: Transaction, address: string, amount: bigint): boolean {
+    return transaction.outputs.some(output => this.outputMatchesPayment(output, address, amount))
+  }
+
+  private async getVerifiedTransaction (txid: string): Promise<{ dapiTransaction: DapiTransaction, transaction: Transaction } | undefined> {
+    try {
+      const dapiTransaction = await this.getTransaction(txid)
+      const transaction = Transaction.fromBytes(dapiTransaction.transaction)
+
+      if (transaction.hash() !== txid) {
+        return undefined
+      }
+
+      return { dapiTransaction, transaction }
+    } catch {
+      return undefined
+    }
+  }
+
+  private async getChainLockedPaymentInfo (txid: string, address: string, amount: bigint): Promise<PaymentInfo | undefined> {
+    const transactionInfo = await this.getVerifiedTransaction(txid)
+
+    if (transactionInfo == null || !transactionInfo.dapiTransaction.isChainLocked) {
+      return undefined
+    }
+
+    if (!this.transactionMatchesPayment(transactionInfo.transaction, address, amount)) {
+      return undefined
+    }
+
+    return {
+      txid,
+      chainLocked: transactionInfo.dapiTransaction.height
+    }
+  }
+
   async generateAddress (): Promise<CoreKeyPair> {
     const { secretKey, publicKey } = secp.keygen()
     const networkType = this.getNetworkType()
@@ -212,7 +264,9 @@ export class DashCoreSDK {
   }
 
   async waitForPayment (address: string, amount: number = 1000): Promise<PaymentInfo> {
-    const pendingTransactions: Transaction[] = []
+    const paymentAmount = this.getPaymentAmount(amount)
+    const pendingTransactions = new Map<string, Transaction>()
+    const pendingInstantLocks = new Map<string, string>()
 
     const iterator = this.subscribeToTransactions([address])
 
@@ -221,50 +275,48 @@ export class DashCoreSDK {
         case 'rawMerkleBlock': {
           await wait(5000)
 
-          for (const pendingTransaction of pendingTransactions) {
-            const dapiTransaction = await this.getTransaction(pendingTransaction.hash())
-            const transaction = Transaction.fromBytes(dapiTransaction.transaction)
+          for (const txid of pendingTransactions.keys()) {
+            const paymentInfo = await this.getChainLockedPaymentInfo(txid, address, paymentAmount)
 
-            if (
-              dapiTransaction.isChainLocked &&
-              pendingTransaction.hash() === transaction.hash() &&
-              pendingTransaction.outputs.some(output =>
-                output.satoshis >= amount &&
-                // @ts-expect-error
-                output.script.toAddress(this.network).toString() === address
-              )
-            ) {
-              return {
-                txid: transaction.hash(),
-                chainLocked: dapiTransaction.height
-              }
+            if (paymentInfo != null) {
+              return paymentInfo
             }
           }
           break
         }
         case 'rawTransaction': {
-          const rawTx = event.data
-          const transaction = Transaction.fromBytes(hexToBytes(rawTx))
-          if (!pendingTransactions.some((pendingTx) => pendingTx.hash() === transaction.hash())) {
-            pendingTransactions.push(transaction)
+          const transaction = Transaction.fromBytes(hexToBytes(event.data))
+
+          if (!this.transactionMatchesPayment(transaction, address, paymentAmount)) {
+            break
           }
+
+          const txid = transaction.hash()
+
+          pendingTransactions.set(txid, transaction)
+
+          const pendingInstantLock = pendingInstantLocks.get(txid)
+
+          if (pendingInstantLock != null) {
+            return {
+              txid,
+              instantLocked: pendingInstantLock
+            }
+          }
+
           break
         }
         case 'instantSendLockMessage': {
-          for (const pendingTransaction of pendingTransactions) {
-            const instantSendLock = InstantLock.fromHex(event.data)
+          const instantSendLock = InstantLock.fromHex(event.data)
 
-            if (instantSendLock.txId === pendingTransaction.hash() &&
-                pendingTransaction.outputs
-                  .some(output => output.satoshis >= amount &&
-                        // @ts-expect-error
-                        output.script.toAddress(this.network).toString() === address)) {
-              return {
-                txid: instantSendLock.txId,
-                instantLocked: event.data
-              }
+          if (pendingTransactions.has(instantSendLock.txId)) {
+            return {
+              txid: instantSendLock.txId,
+              instantLocked: event.data
             }
           }
+
+          pendingInstantLocks.set(instantSendLock.txId, event.data)
           break
         }
         default:
@@ -276,10 +328,12 @@ export class DashCoreSDK {
   }
 
   async * subscribeToTransactions (addresses: string[]): AsyncIterable<SubscribeToTransactionsEvent> {
-    const numberOfElements = 1
+    const numberOfElements = Math.max(addresses.length, 1)
     const bf = bloomFilter.create(numberOfElements, BLOOM_FILTER_FALSE_POSITIVE_RATE)
 
-    bf.insert(base58.decode(addresses[0]).slice(1, 21))
+    for (const address of addresses) {
+      bf.insert(addressToPublicKeyHash(address))
+    }
 
     // subscribe to new transactions
     const count = 0
@@ -289,58 +343,68 @@ export class DashCoreSDK {
 
     const fromBlockHeight = (await this.getBestBlockHeight()).height
 
-    const abortController = new AbortController()
+    while (true) {
+      const abortController = new AbortController()
+      let reconnectRequested = false
 
-    const iterator = this.subscribeToTransactionsWithProofs({ ...bf.toObject() }, count, sendTransactionHashes, undefined, fromBlockHeight, abortController)
+      const iterator = this.subscribeToTransactionsWithProofs({ ...bf.toObject() }, count, sendTransactionHashes, undefined, fromBlockHeight, abortController)
 
-    setTimeout(() => {
-      abortController.abort('DAPI_RECONNECT_STREAM')
-    }, DAPI_STREAM_RECONNECT_TIMEOUT)
+      const reconnectTimeout = setTimeout(() => {
+        reconnectRequested = true
+        abortController.abort()
+      }, DAPI_STREAM_RECONNECT_TIMEOUT)
 
-    try {
-      for await (const event of iterator.responses) {
-        const { responses } = event
+      let shouldReconnect = false
 
-        switch (responses.oneofKind) {
-          case 'rawMerkleBlock': {
-            yield ({
-              event: 'rawMerkleBlock',
-              data: bytesToHex(responses.rawMerkleBlock)
-            })
-            break
-          }
-          case 'rawTransactions': {
-            for (const transaction of responses.rawTransactions.transactions) {
-              const tx = Transaction.fromBytes(transaction)
-              if (tx.outputs.some((output) => output.getAddress(this.getNetworkType()))) {
+      try {
+        for await (const event of iterator.responses) {
+          const { responses } = event
+
+          switch (responses.oneofKind) {
+            case 'rawMerkleBlock': {
+              yield ({
+                event: 'rawMerkleBlock',
+                data: bytesToHex(responses.rawMerkleBlock)
+              })
+              break
+            }
+            case 'rawTransactions': {
+              for (const transaction of responses.rawTransactions.transactions) {
                 yield ({
                   event: 'rawTransaction',
                   data: bytesToHex(transaction)
                 })
               }
+              break
             }
-            break
-          }
-          case 'instantSendLockMessages': {
-            for (const instantSendLockMessage of responses.instantSendLockMessages.messages) {
-              yield ({
-                event: 'instantSendLockMessage',
-                data: bytesToHex(instantSendLockMessage)
-              })
+            case 'instantSendLockMessages': {
+              for (const instantSendLockMessage of responses.instantSendLockMessages.messages) {
+                yield ({
+                  event: 'instantSendLockMessage',
+                  data: bytesToHex(instantSendLockMessage)
+                })
+              }
+              break
             }
-            break
+            default:
+              break
           }
-          default:
-            break
         }
-      }
-    } catch (e) {
-      // resubscribe on DAPI timeout or connection errors
-      if (e?.message === 'DAPI_RECONNECT_STREAM') {
-        yield * this.subscribeToTransactions(addresses)
+
+        shouldReconnect = true
+      } catch (e) {
+        shouldReconnect = reconnectRequested
+
+        if (!shouldReconnect) {
+          throw e
+        }
+      } finally {
+        clearTimeout(reconnectTimeout)
       }
 
-      throw e
+      if (!shouldReconnect) {
+        return
+      }
     }
   }
 

@@ -5,10 +5,9 @@ import {
   decodeCompactSize,
   encodeCompactSize,
   getCompactVariableSize,
-  hexToBytes,
-  networkValueToEnumValue
+  hexToBytes
 } from '../utils.js'
-import { DEFAULT_NETWORK, OPCODES } from '../constants.js'
+import { DEFAULT_NETWORK } from '../constants.js'
 import { NetworkLike, OutputJSON } from '../types.js'
 
 export class Output {
@@ -72,20 +71,7 @@ export class Output {
   }
 
   getAddress (network: NetworkLike = DEFAULT_NETWORK): string | undefined {
-    const normalNetwork = networkValueToEnumValue(network)
-
-    if (normalNetwork > 255) {
-      throw new Error('Network prefix cannot be more than 255')
-    }
-
-    // TODO: add other codes
-    const cryptoOpCodes = [OPCODES.OP_HASH160]
-
-    const cryptoOpcodeIndex = this.script.parsedScriptChunks.findIndex(chunk => cryptoOpCodes.includes(chunk.opcode))
-
-    if (cryptoOpcodeIndex === -1) {
-      return undefined
-    }
+    return this.script.getAddress(network)
   }
 
   toJSON (): OutputJSON {
