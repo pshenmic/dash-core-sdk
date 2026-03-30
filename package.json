@@ -1,7 +1,14 @@
 {
   "name": "dash-core-sdk",
   "version": "1.1.0-dev.2",
-  "main": "index.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc && rollup -c rollup.config.js",
     "build:grpc": "protoc --ts_out proto/generated --ts_opt generate_dependencies --ts_opt client_generic --proto_path proto core.proto && yarn patch:grpc",
