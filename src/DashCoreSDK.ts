@@ -342,69 +342,57 @@ export class DashCoreSDK {
     const sendTransactionHashes = false
 
     const fromBlockHeight = (await this.getBestBlockHeight()).height
+    const abortController = new AbortController()
+    const reconnectReason = 'DAPI_RECONNECT_STREAM'
 
-    while (true) {
-      const abortController = new AbortController()
-      let reconnectRequested = false
+    const iterator = this.subscribeToTransactionsWithProofs({ ...bf.toObject() }, count, sendTransactionHashes, undefined, fromBlockHeight, abortController)
 
-      const iterator = this.subscribeToTransactionsWithProofs({ ...bf.toObject() }, count, sendTransactionHashes, undefined, fromBlockHeight, abortController)
+    const reconnectTimeout = setTimeout(() => {
+      abortController.abort(reconnectReason)
+    }, DAPI_STREAM_RECONNECT_TIMEOUT)
 
-      const reconnectTimeout = setTimeout(() => {
-        reconnectRequested = true
-        abortController.abort()
-      }, DAPI_STREAM_RECONNECT_TIMEOUT)
+    try {
+      for await (const event of iterator.responses) {
+        const { responses } = event
 
-      let shouldReconnect = false
-
-      try {
-        for await (const event of iterator.responses) {
-          const { responses } = event
-
-          switch (responses.oneofKind) {
-            case 'rawMerkleBlock': {
-              yield ({
-                event: 'rawMerkleBlock',
-                data: bytesToHex(responses.rawMerkleBlock)
-              })
-              break
-            }
-            case 'rawTransactions': {
-              for (const transaction of responses.rawTransactions.transactions) {
-                yield ({
-                  event: 'rawTransaction',
-                  data: bytesToHex(transaction)
-                })
-              }
-              break
-            }
-            case 'instantSendLockMessages': {
-              for (const instantSendLockMessage of responses.instantSendLockMessages.messages) {
-                yield ({
-                  event: 'instantSendLockMessage',
-                  data: bytesToHex(instantSendLockMessage)
-                })
-              }
-              break
-            }
-            default:
-              break
+        switch (responses.oneofKind) {
+          case 'rawMerkleBlock': {
+            yield ({
+              event: 'rawMerkleBlock',
+              data: bytesToHex(responses.rawMerkleBlock)
+            })
+            break
           }
+          case 'rawTransactions': {
+            for (const transactionBytes of responses.rawTransactions.transactions) {
+              yield ({
+                event: 'rawTransaction',
+                data: bytesToHex(transactionBytes)
+              })
+            }
+            break
+          }
+          case 'instantSendLockMessages': {
+            for (const instantSendLockMessage of responses.instantSendLockMessages.messages) {
+              yield ({
+                event: 'instantSendLockMessage',
+                data: bytesToHex(instantSendLockMessage)
+              })
+            }
+            break
+          }
+          default:
+            break
         }
-
-        shouldReconnect = true
-      } catch (e) {
-        shouldReconnect = reconnectRequested
-
-        if (!shouldReconnect) {
-          throw e
-        }
-      } finally {
-        clearTimeout(reconnectTimeout)
+      }
+    } catch (e) {
+      if (e?.message === reconnectReason || abortController.signal.reason === reconnectReason) {
+        return yield * this.subscribeToTransactions(addresses)
       }
 
-      if (!shouldReconnect) {
-        return
-      }
+      throw e
+    } finally {
+      clearTimeout(reconnectTimeout)
     }
   }
 
