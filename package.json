@@ -13,9 +13,9 @@
     "build": "tsc && rollup -c rollup.config.js",
     "build:grpc": "protoc --ts_out proto/generated --ts_opt generate_dependencies --ts_opt client_generic --proto_path proto core.proto && yarn patch:grpc",
     "patch:grpc": "node scripts/patch-esm-grpc.js",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch",
+    "test:coverage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
     "gen-proto": "protoc -I=./proto --ts_out=proto/generated ./proto/core.proto",
     "lint": "ts-standard --fix --project ./tsconfig.eslint.json"
   },

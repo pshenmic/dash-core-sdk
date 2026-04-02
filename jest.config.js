@@ -14,9 +14,6 @@ export default {
       }
     ]
   },
-  transformIgnorePatterns: [
-    '/node_modules/(?!@noble/hashes/)'
-  ],
   testMatch: [
     '**/tests/**/*.test.ts',
     '**/tests/**/*.spec.ts',
