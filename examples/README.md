@@ -15,21 +15,35 @@ yarn build
 Run:
 
 ```bash
-node examples/node-smoke.mjs
+node examples/node-smoke.js
 ```
 
-Optional environment variables:
+Wait for a payment:
 
 ```bash
-DASH_NETWORK=mainnet DAPI_URL=https://158.160.14.115:443 node examples/node-smoke.mjs
+node examples/wait-for-payment.js
+```
+
+Create an asset lock transaction from known UTXOs:
+
+```bash
+node examples/create-asset-lock.js
+```
+
+Create Platform asset lock proofs from an existing asset lock transaction:
+
+```bash
+node examples/create-asset-lock-proofs.js
 ```
 
 What it does:
 
 - creates a `DashCoreSDK` instance
-- overrides the default connection pool
 - generates an address
 - performs a network smoke check with `getBlockchainStatus()` and `getBestBlockHeight()`
+- waits for a payment using `waitForPayment()`
+- builds an asset lock transaction from explicitly provided UTXOs and credit outputs
+- builds instant or chain asset lock proofs from an asset lock transaction and lock data
 
 ## Browser
 

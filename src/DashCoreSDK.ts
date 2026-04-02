@@ -18,14 +18,17 @@ import {
   TransactionsWithProofsRequest, type TransactionsWithProofsResponse
 } from '../proto/generated/core.js'
 import bloomFilter from 'bloom-filter'
-import { BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, Network } from './constants.js'
+import { BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, FEE_PER_BYTE, MIN_FEE_RELAY, Network, TransactionType } from './constants.js'
 import { addressToPublicKeyHash, bytesToHex, hexToBytes, wait } from './utils.js'
 import { p2pkh } from '@scure/btc-signer'
 import * as secp from '@noble/secp256k1'
 import { PrivateKey } from './types/PrivateKey.js'
-import { Transaction } from './types/Transaction.js'
+import { Transaction, type TransactionInputToSign } from './types/Transaction.js'
 import { InstantLock } from './types/InstantLock.js'
+import { Input } from './types/Input.js'
+import { OutPoint } from './types/OutPoint.js'
 import { Output } from './types/Output.js'
+import { Script } from './types/Script.js'
 import type { ServerStreamingCall } from '@protobuf-ts/runtime-rpc'
 import {AssetLockTx} from "./types/ExtraPayload/AssetLockTx.js"
 import {AssetUnlockTx} from "./types/ExtraPayload/AssetUnlockTx.js"
@@ -74,6 +77,37 @@ export interface PaymentInfo {
 export interface CoreKeyPair {
   address: string
   wif: string
+}
+
+export interface AssetLockSpendableUtxo {
+  txid: string
+  vout: number
+  satoshis: number | bigint
+  privateKeyWif: string
+}
+
+export interface AssetLockCreditOutput {
+  address: string
+  amountSatoshis: number | bigint
+}
+
+export interface CreateAssetLockTransactionOptions {
+  utxos: AssetLockSpendableUtxo[]
+  creditOutputs: AssetLockCreditOutput[]
+  changeAddress?: string
+}
+
+export interface InstantAssetLockProof {
+  type: 0
+  instantLock: Uint8Array
+  transaction: Uint8Array
+  outputIndex: number
+}
+
+export interface ChainAssetLockProof {
+  type: 1
+  coreChainLockedHeight: number
+  outPoint: OutPoint
 }
 
 export {BlockHeader} from "./types/BlockHeader.js"
@@ -134,6 +168,22 @@ export class DashCoreSDK {
     return BigInt(amount)
   }
 
+  private getSatoshisAmount (amount: number | bigint, fieldName: string): bigint {
+    if (typeof amount === 'bigint') {
+      if (amount < 0n) {
+        throw new Error(`${fieldName} must be a non-negative integer`)
+      }
+
+      return amount
+    }
+
+    if (!Number.isSafeInteger(amount) || amount < 0) {
+      throw new Error(`${fieldName} must be a non-negative safe integer`)
+    }
+
+    return BigInt(amount)
+  }
+
   private getOutputAddress (output: Output): string | undefined {
     return output.script.getAddress(this.getNetworkType())
   }
@@ -175,6 +225,86 @@ export class DashCoreSDK {
     return {
       txid,
       chainLocked: transactionInfo.dapiTransaction.height
+    }
+  }
+
+  private getRequiredTransactionFee (transaction: Transaction): bigint {
+    return BigInt(Math.max(MIN_FEE_RELAY, transaction.bytes().byteLength * FEE_PER_BYTE))
+  }
+
+  private rebalanceTransactionFee (transaction: Transaction, totalInputAmount: bigint, signingInputs: TransactionInputToSign[]): void {
+    while (true) {
+      transaction.signInputs(signingInputs)
+
+      const fee = totalInputAmount - transaction.getOutputAmount()
+      const requiredFee = this.getRequiredTransactionFee(transaction)
+
+      if (fee >= requiredFee) {
+        return
+      }
+
+      if (transaction.outputs.length < 2) {
+        throw new Error(`Insufficient fee for asset lock transaction: got ${fee.toString()} satoshis, expected at least ${requiredFee.toString()} satoshis`)
+      }
+
+      const missingFee = requiredFee - fee
+      const changeOutputIndex = transaction.outputs.length - 1
+      const changeOutput = transaction.outputs[changeOutputIndex]
+      const nextChangeAmount = changeOutput.satoshis - missingFee
+
+      if (nextChangeAmount >= BigInt(MIN_FEE_RELAY)) {
+        changeOutput.satoshis = nextChangeAmount
+        continue
+      }
+
+      transaction.outputs.splice(changeOutputIndex, 1)
+    }
+  }
+
+  private normalizeTransactionBytes (transaction: Transaction | Uint8Array | string): Uint8Array {
+    if (transaction instanceof Transaction) {
+      return transaction.bytes()
+    }
+
+    if (typeof transaction === 'string') {
+      return hexToBytes(transaction)
+    }
+
+    return transaction
+  }
+
+  private normalizeInstantLockBytes (instantLock: InstantLock | Uint8Array | string): Uint8Array {
+    if (instantLock instanceof InstantLock) {
+      return instantLock.bytes()
+    }
+
+    if (typeof instantLock === 'string') {
+      return hexToBytes(instantLock)
+    }
+
+    return instantLock
+  }
+
+  private getAssetLockTransactionProofData (transaction: Transaction | Uint8Array | string, outputIndex: number): { transactionBytes: Uint8Array, transactionObject: Transaction, txid: string } {
+    if (!Number.isSafeInteger(outputIndex) || outputIndex < 0) {
+      throw new Error('outputIndex must be a non-negative safe integer')
+    }
+
+    const transactionBytes = this.normalizeTransactionBytes(transaction)
+    const transactionObject = Transaction.fromBytes(transactionBytes)
+
+    if (transactionObject.type !== TransactionType.TRANSACTION_ASSET_LOCK || !(transactionObject.extraPayload instanceof AssetLockTx)) {
+      throw new Error('Asset lock proof requires an asset lock transaction')
+    }
+
+    if (outputIndex >= transactionObject.extraPayload.outputs.length) {
+      throw new Error(`outputIndex must be lower than the number of asset lock credit outputs (${transactionObject.extraPayload.outputs.length})`)
+    }
+
+    return {
+      transactionBytes,
+      transactionObject,
+      txid: transactionObject.hash()
     }
   }
 
@@ -245,6 +375,106 @@ export class DashCoreSDK {
     const client = this.grpcConnectionPool.getClient()
 
     return (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks }))).response
+  }
+
+  createAssetLockTransaction (options: CreateAssetLockTransactionOptions): Transaction {
+    if (options.utxos.length === 0) {
+      throw new Error('At least one UTXO is required to build an asset lock transaction')
+    }
+
+    if (options.creditOutputs.length === 0) {
+      throw new Error('At least one credit output is required to build an asset lock transaction')
+    }
+
+    if (options.creditOutputs.length > 255) {
+      throw new Error('Asset lock transactions support at most 255 credit outputs')
+    }
+
+    const payloadOutputs = options.creditOutputs.map((creditOutput, index) => {
+      const amount = this.getSatoshisAmount(creditOutput.amountSatoshis, `Credit output amount at index ${index}`)
+
+      if (amount === 0n) {
+        throw new Error(`Credit output amount at index ${index} must be greater than 0`)
+      }
+
+      return Output.createP2PKH(amount, creditOutput.address)
+    })
+
+    const lockedAmount = payloadOutputs.reduce((acc, output) => acc + output.satoshis, 0n)
+
+    const transaction = new Transaction(
+      [],
+      [Output.createAssetLockBurn(lockedAmount)],
+      undefined,
+      undefined,
+      TransactionType.TRANSACTION_ASSET_LOCK,
+      new AssetLockTx(1, payloadOutputs.length, payloadOutputs)
+    )
+
+    let totalInputAmount = 0n
+    const signingInputs: TransactionInputToSign[] = []
+
+    for (let i = 0; i < options.utxos.length; i++) {
+      const utxo = options.utxos[i]
+      const amount = this.getSatoshisAmount(utxo.satoshis, `UTXO amount at index ${i}`)
+      const privateKey = PrivateKey.fromWIF(utxo.privateKeyWif)
+
+      if (privateKey.network !== this.getNetworkType()) {
+        throw new Error(`UTXO private key at index ${i} does not match SDK network`)
+      }
+
+      totalInputAmount += amount
+      transaction.addInput(new Input(utxo.txid, utxo.vout, new Script(), 0))
+
+      signingInputs.push({
+        inputIndex: i,
+        privateKey,
+        lockingScript: Output.createP2PKH(0n, privateKey.getAddress()).script
+      })
+    }
+
+    if (totalInputAmount <= lockedAmount) {
+      throw new Error('UTXO amount must be greater than locked amount to pay the transaction fee')
+    }
+
+    const changeAddress = options.changeAddress ?? signingInputs[0].privateKey.getAddress()
+
+    transaction.generateChange(changeAddress, totalInputAmount)
+    this.rebalanceTransactionFee(transaction, totalInputAmount, signingInputs)
+
+    return transaction
+  }
+
+  createInstantAssetLockProof (transaction: Transaction | Uint8Array | string, instantLock: InstantLock | Uint8Array | string, outputIndex: number = 0): InstantAssetLockProof {
+    const { transactionBytes, txid } = this.getAssetLockTransactionProofData(transaction, outputIndex)
+
+    const instantLockBytes = this.normalizeInstantLockBytes(instantLock)
+    const instantLockObject = InstantLock.fromBytes(instantLockBytes)
+
+    if (instantLockObject.txId !== txid) {
+      throw new Error(`InstantLock txid ${instantLockObject.txId} does not match transaction txid ${txid}`)
+    }
+
+    return {
+      type: 0,
+      instantLock: instantLockBytes,
+      transaction: transactionBytes,
+      outputIndex
+    }
+  }
+
+  createChainAssetLockProof (transaction: Transaction | Uint8Array | string, coreChainLockedHeight: number, outputIndex: number = 0): ChainAssetLockProof {
+    if (!Number.isSafeInteger(coreChainLockedHeight) || coreChainLockedHeight < 0) {
+      throw new Error('coreChainLockedHeight must be a non-negative safe integer')
+    }
+
+    const { txid } = this.getAssetLockTransactionProofData(transaction, outputIndex)
+
+    return {
+      type: 1,
+      coreChainLockedHeight,
+      outPoint: new OutPoint(txid, outputIndex)
+    }
   }
 
   subscribeToBlockHeadersWithChainLocks (count: number = 0, fromBlockHash?: Uint8Array, fromBlockHeight?: number): AsyncIterable<BlockHeadersWithChainLocksResponse> {

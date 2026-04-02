@@ -31,6 +31,12 @@ import { MnHfTx } from './ExtraPayload/MnHfTx.js'
 import { AssetLockTx } from './ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './ExtraPayload/AssetUnlockTx.js'
 
+export interface TransactionInputToSign {
+  inputIndex: number
+  privateKey: PrivateKey
+  lockingScript: Script
+}
+
 export class Transaction {
   version: number
   type: TransactionType
@@ -117,8 +123,8 @@ export class Transaction {
     return undefined
   }
 
-  #signInput (privateKey: PrivateKey, inputIndex: number): void {
-    if (this.inputs.length < inputIndex) {
+  #signInput (privateKey: PrivateKey, inputIndex: number, lockingScript?: Script): void {
+    if (this.inputs.length <= inputIndex) {
       throw new Error(`input with not found (index: ${inputIndex})`)
     }
     if (inputIndex < 0) {
@@ -133,6 +139,8 @@ export class Transaction {
     for (let i = 0; i < this.inputs.length; i++) {
       if (i !== inputIndex) {
         this.inputs[i].scriptSig = new Script()
+      } else {
+        this.inputs[i].scriptSig = lockingScript != null ? new Script(lockingScript) : new Script(savedInputs[i].scriptSig)
       }
     }
 
@@ -179,7 +187,13 @@ export class Transaction {
   // TODO: MultiSig
   sign (privateKey: PrivateKey): void {
     for (let i = 0; i < this.inputs.length; i++) {
-      this.#signInput(privateKey, i)
+      this.#signInput(privateKey, i, this.inputs[i].scriptSig)
+    }
+  }
+
+  signInputs (inputs: TransactionInputToSign[]): void {
+    for (const input of inputs) {
+      this.#signInput(input.privateKey, input.inputIndex, input.lockingScript)
     }
   }
 
