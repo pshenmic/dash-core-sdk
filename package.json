@@ -17,7 +17,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "gen-proto": "protoc -I=./proto --ts_out=proto/generated ./proto/core.proto",
-    "lint": "ts-standard --fix"
+    "lint": "ts-standard --fix --project ./tsconfig.eslint.json"
   },
   "type": "module",
   "author": "",

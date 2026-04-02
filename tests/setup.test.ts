@@ -1,5 +1,3 @@
-import { describe, it, expect } from '@jest/globals'
-
 describe('Jest setup verification', () => {
   it('should run basic test', () => {
     expect(true).toBe(true)

@@ -1,21 +1,22 @@
 export default {
-  preset: 'ts-jest',
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1'
   },
   transform: {
-    '^.+\\.tsx?$': [
+    '^.+\\.[tj]sx?$': [
       'ts-jest',
       {
         useESM: true,
-        tsconfig: {
-          module: 'esnext'
-        }
+        tsconfig: './tsconfig.test.json'
       }
     ]
   },
+  transformIgnorePatterns: [
+    '/node_modules/(?!@noble/hashes/)'
+  ],
   testMatch: [
     '**/tests/**/*.test.ts',
     '**/tests/**/*.spec.ts',
