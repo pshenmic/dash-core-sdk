@@ -18,6 +18,8 @@ export {
   DashCoreSDK,
   BlockHeader,
   Block,
+  ExtraPayload,
+  Messages,
   BloomFilterWriter,
   Input,
   InstantLock,
@@ -31,3 +33,10 @@ export {
   Transaction,
   utils
 }
+
+export type {
+  BloomFilter,
+  CoreKeyPair,
+  PaymentInfo,
+  SubscribeToTransactionsEvent
+} from './src/DashCoreSDK.js'

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>dash-core-sdk browser example</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4efe7;
+        --card: #fffaf2;
+        --border: #d5c3a4;
+        --ink: #1f2430;
+        --muted: #635b50;
+        --accent: #9b5c2e;
+        --accent-2: #2d6a6a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+        background:
+          radial-gradient(circle at top left, rgba(155, 92, 46, 0.18), transparent 30%),
+          radial-gradient(circle at bottom right, rgba(45, 106, 106, 0.14), transparent 25%),
+          var(--bg);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(860px, calc(100vw - 32px));
+        margin: 40px auto;
+        padding: 32px;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgba(255, 250, 242, 0.95), rgba(255, 250, 242, 0.86));
+        box-shadow: 0 20px 60px rgba(37, 26, 14, 0.12);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(2rem, 5vw, 3.4rem);
+        line-height: 0.95;
+        letter-spacing: -0.04em;
+      }
+
+      p {
+        margin: 0 0 16px;
+        color: var(--muted);
+        max-width: 60ch;
+      }
+
+      .controls {
+        display: grid;
+        gap: 12px;
+        margin: 24px 0;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 0.95rem;
+      }
+
+      input, select, button {
+        font: inherit;
+      }
+
+      input, select {
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.8);
+        color: var(--ink);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      button {
+        border: 0;
+        padding: 12px 18px;
+        border-radius: 999px;
+        cursor: pointer;
+        color: white;
+        background: var(--accent);
+      }
+
+      button.secondary {
+        background: var(--accent-2);
+      }
+
+      pre {
+        margin: 20px 0 0;
+        padding: 18px;
+        min-height: 220px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: rgba(31, 36, 48, 0.94);
+        color: #f5f2ea;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>dash-core-sdk in the browser</h1>
+      <p>
+        This example uses the bundled browser build from <code>dist/browser.js</code>. Start a local static server from
+        the repository root after <code>yarn build:grpc</code> and <code>yarn build</code>, then open
+        <code>/examples/browser/</code>.
+      </p>
+
+      <div class="controls">
+        <label>
+          Network
+          <select id="network">
+            <option value="testnet" selected>testnet</option>
+            <option value="mainnet">mainnet</option>
+          </select>
+        </label>
+
+        <label>
+          DAPI URL
+          <input id="dapi-url" value="https://158.160.14.115:1443" />
+        </label>
+      </div>
+
+      <div class="controls">
+        <label>
+          Payment Address
+          <input id="payment-address" placeholder="Enter a Dash address to watch" />
+        </label>
+
+        <label>
+          Amount (satoshis)
+          <input id="payment-amount" type="number" min="0" step="1" value="1000" />
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="generate-address">Generate Address</button>
+        <button id="check-status" class="secondary">Check Blockchain Status</button>
+        <button id="wait-for-payment">Wait For Payment</button>
+      </div>
+
+      <pre id="output">Ready.</pre>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

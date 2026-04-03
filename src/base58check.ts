@@ -12,11 +12,11 @@ const Base58Check = {
 
     return base58.encode(out)
   },
-  decode: (data: string, skipVerify?: boolean) => {
+  decode: (data: string, skipVerify: boolean = false) => {
     const bytes = base58.decode(data)
     const body = bytes.slice(0, -4)
 
-    if (skipVerify != null && skipVerify) {
+    if (!skipVerify) {
       const passedChecksum = bytes.slice(-4)
       const correctedChecksum = doubleSHA256(body).slice(0, 4)
 
