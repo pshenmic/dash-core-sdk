@@ -30,6 +30,12 @@ Create an asset lock transaction from known UTXOs:
 node examples/create-asset-lock.js
 ```
 
+Create an asset lock transaction from a payment txid and an identity funding key WIF:
+
+```bash
+node examples/create-asset-lock-from-payment.js
+```
+
 Create Platform asset lock proofs from an existing asset lock transaction:
 
 ```bash
@@ -43,6 +49,7 @@ What it does:
 - performs a network smoke check with `getBlockchainStatus()` and `getBestBlockHeight()`
 - waits for a payment using `waitForPayment()`
 - builds an asset lock transaction from explicitly provided UTXOs and credit outputs
+- builds an asset lock transaction from a locked payment and an identity funding key WIF derived by the caller
 - builds instant or chain asset lock proofs from an asset lock transaction and lock data
 
 ## Browser

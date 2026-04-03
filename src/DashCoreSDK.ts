@@ -97,6 +97,16 @@ export interface CreateAssetLockTransactionOptions {
   changeAddress?: string
 }
 
+export interface CreateAssetLockTransactionFromPaymentOptions {
+  txid: string
+  fundingPrivateKeyWif?: string
+  privateKeyWif?: string
+  oneTimePrivateKeyWif?: string
+  outputIndex?: number
+  creditAddress?: string
+  changeAddress?: string
+}
+
 export interface InstantAssetLockProof {
   type: 0
   instantLock: Uint8Array
@@ -230,6 +240,30 @@ export class DashCoreSDK {
 
   private getRequiredTransactionFee (transaction: Transaction): bigint {
     return BigInt(Math.max(MIN_FEE_RELAY, transaction.bytes().byteLength * FEE_PER_BYTE))
+  }
+
+  private getPaymentOutputIndex (transaction: Transaction, address: string, outputIndex?: number): number {
+    if (outputIndex != null) {
+      if (!Number.isSafeInteger(outputIndex) || outputIndex < 0 || outputIndex >= transaction.outputs.length) {
+        throw new Error('outputIndex must point to an existing transaction output')
+      }
+
+      const outputAddress = this.getOutputAddress(transaction.outputs[outputIndex])
+
+      if (outputAddress !== address) {
+        throw new Error(`Transaction output at index ${outputIndex} does not pay to ${address}`)
+      }
+
+      return outputIndex
+    }
+
+    const resolvedOutputIndex = transaction.outputs.findIndex(output => this.getOutputAddress(output) === address)
+
+    if (resolvedOutputIndex === -1) {
+      throw new Error(`Transaction does not contain a payment output for ${address}`)
+    }
+
+    return resolvedOutputIndex
   }
 
   private rebalanceTransactionFee (transaction: Transaction, totalInputAmount: bigint, signingInputs: TransactionInputToSign[]): void {
@@ -443,6 +477,57 @@ export class DashCoreSDK {
     this.rebalanceTransactionFee(transaction, totalInputAmount, signingInputs)
 
     return transaction
+  }
+
+  async createAssetLockTransactionFromPayment (options: CreateAssetLockTransactionFromPaymentOptions): Promise<Transaction> {
+    const privateKeyWif = options.fundingPrivateKeyWif ?? options.oneTimePrivateKeyWif ?? options.privateKeyWif
+
+    if (privateKeyWif == null) {
+      throw new Error('fundingPrivateKeyWif, oneTimePrivateKeyWif or privateKeyWif is required')
+    }
+
+    const privateKey = PrivateKey.fromWIF(privateKeyWif)
+
+    if (privateKey.network !== this.getNetworkType()) {
+      throw new Error('Payment private key does not match SDK network')
+    }
+
+    const paymentAddress = privateKey.getAddress()
+    const transactionInfo = await this.getVerifiedTransaction(options.txid)
+
+    if (transactionInfo == null) {
+      throw new Error(`Could not load or verify payment transaction ${options.txid}`)
+    }
+
+    if (!transactionInfo.dapiTransaction.isInstantLocked && !transactionInfo.dapiTransaction.isChainLocked && transactionInfo.dapiTransaction.confirmations < 1) {
+      throw new Error(`Payment transaction ${options.txid} is not locked or confirmed yet`)
+    }
+
+    const paymentOutputIndex = this.getPaymentOutputIndex(transactionInfo.transaction, paymentAddress, options.outputIndex)
+    const paymentOutput = transactionInfo.transaction.outputs[paymentOutputIndex]
+    const lockedAmount = paymentOutput.satoshis - BigInt(MIN_FEE_RELAY)
+
+    if (lockedAmount <= 0n) {
+      throw new Error(`Payment output at index ${paymentOutputIndex} is too small to cover the minimum relay fee`)
+    }
+
+    return this.createAssetLockTransaction({
+      utxos: [
+        {
+          txid: options.txid,
+          vout: paymentOutputIndex,
+          satoshis: paymentOutput.satoshis,
+          privateKeyWif
+        }
+      ],
+      creditOutputs: [
+        {
+          address: options.creditAddress ?? paymentAddress,
+          amountSatoshis: lockedAmount
+        }
+      ],
+      changeAddress: options.changeAddress ?? paymentAddress
+    })
   }
 
   createInstantAssetLockProof (transaction: Transaction | Uint8Array | string, instantLock: InstantLock | Uint8Array | string, outputIndex: number = 0): InstantAssetLockProof {

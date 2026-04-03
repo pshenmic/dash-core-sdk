@@ -22,6 +22,7 @@ export type {
   BloomFilter,
   ChainAssetLockProof,
   CreateAssetLockTransactionOptions,
+  CreateAssetLockTransactionFromPaymentOptions,
   CoreKeyPair,
   InstantAssetLockProof,
   PaymentInfo,
