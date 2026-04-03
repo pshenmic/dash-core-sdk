@@ -22,12 +22,12 @@ export default [
     input: 'index.ts',
     output: [
       {
-        file: 'dist/browser.js',
+        file: 'dist/bundle.es6.js',
         format: 'es'
       },
       {
         name: 'DashCoreSDK',
-        file: 'dist/bundle.min.js',
+        file: 'dist/bundle.umd.js',
         format: 'umd'
       }
     ],

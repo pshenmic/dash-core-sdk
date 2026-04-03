@@ -48,7 +48,7 @@ http://127.0.0.1:4173/examples/browser/
 What it does:
 
 - imports the built SDK from `dist/`
-- imports the bundled browser build from `dist/browser.js`
+- imports the bundled browser build from `dist/bundle.es6.js`
 - generates an address in the browser
 - optionally performs a blockchain status smoke check against the selected DAPI URL
 

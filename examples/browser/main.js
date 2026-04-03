@@ -1,4 +1,4 @@
-import { DashCoreSDK } from '../../dist/browser.js'
+import { DashCoreSDK } from '../../dist/bundle.es6.js'
 
 const output = document.getElementById('output')
 const networkSelect = document.getElementById('network')
