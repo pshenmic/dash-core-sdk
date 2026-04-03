@@ -1,4 +1,4 @@
-import { DashCoreSDK } from './src/DashCoreSDK.js'
+import { DashCoreSDK, ExtraPayload, Messages } from './src/DashCoreSDK.js'
 import { Block } from './src/types/Block.js'
 import { BlockHeader } from './src/types/BlockHeader.js'
 import { BloomFilterWriter } from './src/types/BloomFilter.js'

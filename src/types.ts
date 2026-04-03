@@ -62,7 +62,7 @@ export interface InstantLockJSON {
 export interface BlockJSON {
   blockHeader: BlockHeaderJSON
   txCount: number
-  txs: TransactionJSON[],
+  txs: TransactionJSON[]
   hash: string
 }
 
