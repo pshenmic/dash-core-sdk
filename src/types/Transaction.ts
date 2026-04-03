@@ -407,7 +407,8 @@ export class Transaction {
       nLockTime: this.#nLockTime,
       outputs: this.outputs.map(output => output.toJSON()),
       inputs: this.inputs.map(input => input.toJSON()),
-      extraPayload: this.extraPayload?.toJSON() ?? null
+      extraPayload: this.extraPayload?.toJSON() ?? null,
+      hash: this.hash()
     }
   }
 }
