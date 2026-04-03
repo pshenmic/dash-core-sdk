@@ -1,6 +1,6 @@
 import { DEFAULT_NETWORK, Network, PubKeyHashAddressNetworkPrefix } from './constants.js'
-import { sha256 as Sha256 } from 'sha.js'
-import Ripemd160 from 'ripemd160'
+import { ripemd160 } from '@noble/hashes/legacy.js'
+import { sha256 } from '@noble/hashes/sha2.js'
 import { Base58Check } from './base58check.js'
 import { NetworkLike } from './types.js'
 
@@ -87,15 +87,15 @@ export async function wait (ms: number): Promise<void> {
 }
 
 export function doubleSHA256 (data: Uint8Array): Uint8Array {
-  const firstStage = new Uint8Array(new Sha256().update(data).digest())
+  const firstStage = sha256(data)
 
-  return new Uint8Array(new Sha256().update(firstStage).digest())
+  return sha256(firstStage)
 }
 
 export function SHA256RIPEMD160 (data: Uint8Array): Uint8Array {
-  const firstStage = new Uint8Array(new Sha256().update(data).digest())
+  const firstStage = sha256(data)
 
-  return new Uint8Array(new Ripemd160().update(firstStage).digest())
+  return ripemd160(firstStage)
 }
 
 export function networkValueToEnumValue (value: Network | keyof typeof Network): Network {

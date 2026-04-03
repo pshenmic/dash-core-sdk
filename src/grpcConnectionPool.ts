@@ -7,7 +7,7 @@ import { GetBlockchainStatusRequest, GetBlockchainStatusResponse_Status } from '
 const GRPC_DEFAULT_POOL_LIMIT = 5
 export type MasternodeList = Record<string, MasternodeInfo>
 export interface GRPCOptions {
-  poolLimit: 5
+  poolLimit: number
   dapiUrl?: string | string[]
 }
 
@@ -53,7 +53,7 @@ const createClient = (url: string, abortController?: AbortController): CoreClien
 }
 
 export default class GRPCConnectionPool {
-  dapiUrls: string[]
+  dapiUrls: string[] = []
   network: string
 
   constructor (network: 'testnet' | 'mainnet', grpcOptions?: GRPCOptions) {
@@ -82,7 +82,7 @@ export default class GRPCConnectionPool {
     }
 
     // Add default seed nodes
-    this.dapiUrls = seedNodes[network]
+    this.dapiUrls = [...seedNodes[network]]
 
     // retrieve last evonodes list
     const evonodeList = await getEvonodeList(network)
@@ -99,7 +99,7 @@ export default class GRPCConnectionPool {
 
     // healthcheck nodes
     for (const url of networkDAPIUrls) {
-      if (this.dapiUrls.length > poolLimit) {
+      if (this.dapiUrls.length >= poolLimit) {
         break
       }
 

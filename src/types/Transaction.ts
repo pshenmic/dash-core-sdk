@@ -279,8 +279,9 @@ export class Transaction {
     const lockTimeView = new DataView(new ArrayBuffer(4))
     lockTimeView.setUint32(0, this.#nLockTime, true)
 
+    const hasExtraPayload = this.type !== TransactionType.TRANSACTION_NORMAL
     const extraPayloadBytes = this.extraPayload?.bytes() ?? new Uint8Array(0)
-    const extraPayloadSizeBytes = encodeCompactSize(extraPayloadBytes.byteLength)
+    const extraPayloadSizeBytes = hasExtraPayload ? encodeCompactSize(extraPayloadBytes.byteLength) : new Uint8Array(0)
 
     const out = new Uint8Array(versionWithTypeView.byteLength + inputCount.byteLength + inputsSize + outputCount.byteLength + outputsSize + lockTimeView.byteLength + extraPayloadSizeBytes.byteLength + extraPayloadBytes.byteLength)
 
