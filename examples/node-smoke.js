@@ -19,7 +19,7 @@ const sdk = new DashCoreSDK({
   poolLimit: 1
 })
 
-async function main() {
+async function main () {
   console.log('--- generateAddress ---')
   const addr = await sdk.generateAddress()
   console.log(addr)

@@ -97,7 +97,7 @@ export class QfCommit {
     const signersOffset = versionBytes.byteLength + llmqTypeBytes.byteLength + quorumHashBytes.byteLength + quorumIndexBytes.byteLength
     const quorumPublicKeyOffset = signersOffset + signersBitsSizeBytes.byteLength + signersBytes.byteLength + validMembersBitsSizeBytes.byteLength + validMembersBytes.byteLength
 
-    const out = new Uint8Array(307 + signersBitsSizeBytes.byteLength + signersBytes.byteLength + validMembersBitsSizeBytes.byteLength + validMembersBytes.byteLength)
+    const out = new Uint8Array(307 + quorumIndexBytes.byteLength + signersBitsSizeBytes.byteLength + signersBytes.byteLength + validMembersBitsSizeBytes.byteLength + validMembersBytes.byteLength)
 
     out.set(versionBytes, 0)
     out.set(llmqTypeBytes, versionBytes.byteLength)

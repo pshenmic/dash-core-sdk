@@ -1,4 +1,4 @@
-import { bytesToHex, decodeCompactSize, doubleSHA256, getCompactVariableSize, hexToBytes } from '../utils.js'
+import { bytesToHex, decodeCompactSize, doubleSHA256, encodeCompactSize, getCompactVariableSize, hexToBytes } from '../utils.js'
 import { MAX_BLOCK_WEIGHT, MIN_TRANSACTION_WEIGHT } from '../constants.js'
 import { MerkleTreeJSON } from '../types.js'
 
@@ -156,6 +156,44 @@ export class MerkleTree {
 
   static fromHex (hex: string): MerkleTree {
     return MerkleTree.fromBytes(hexToBytes(hex))
+  }
+
+  bytes (): Uint8Array {
+    const transactionCountView = new DataView(new ArrayBuffer(4))
+    transactionCountView.setUint32(0, this.transactionCount, true)
+
+    const hashCountBytes = encodeCompactSize(this.hashes.length)
+
+    const flagByteCount = Math.ceil(this.flags.length / 8)
+    const flagBytes = new Uint8Array(flagByteCount)
+    for (let i = 0; i < this.flags.length; i++) {
+      if (this.flags[i]) {
+        flagBytes[Math.floor(i / 8)] |= (1 << (i % 8))
+      }
+    }
+    const flagByteCountBytes = encodeCompactSize(flagByteCount)
+
+    const totalSize = 4 + hashCountBytes.length + this.hashes.length * 32 + flagByteCountBytes.length + flagByteCount
+    const out = new Uint8Array(totalSize)
+
+    let offset = 0
+    out.set(new Uint8Array(transactionCountView.buffer), offset)
+    offset += 4
+
+    out.set(hashCountBytes, offset)
+    offset += hashCountBytes.length
+
+    for (const hash of this.hashes) {
+      out.set(hexToBytes(hash), offset)
+      offset += 32
+    }
+
+    out.set(flagByteCountBytes, offset)
+    offset += flagByteCountBytes.length
+
+    out.set(flagBytes, offset)
+
+    return out
   }
 
   toJSON (): MerkleTreeJSON {

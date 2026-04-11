@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": [
+      "jest",
+      "node"
+    ]
+  },
+  "include": [
+    "./index.ts",
+    "./src/**/*",
+    "./tests/**/*"
+  ]
+}

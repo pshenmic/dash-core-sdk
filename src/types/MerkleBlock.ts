@@ -24,6 +24,17 @@ export class MerkleBlock {
     return MerkleBlock.fromBytes(hexToBytes(hex))
   }
 
+  bytes (): Uint8Array {
+    const headerBytes = this.blockHeader.bytes()
+    const merkleTreeBytes = this.merkleTree.bytes()
+
+    const out = new Uint8Array(headerBytes.length + merkleTreeBytes.length)
+    out.set(headerBytes, 0)
+    out.set(merkleTreeBytes, headerBytes.length)
+
+    return out
+  }
+
   toJSON (): MerkleBlockJSON {
     return {
       blockHeader: this.blockHeader.toJSON(),

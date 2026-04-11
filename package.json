@@ -1,23 +1,17 @@
 {
   "name": "dash-core-sdk",
-  "version": "1.1.0-dev.2",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
+  "version": "1.1.2",
+  "main": "./index.js",
+  "types": "./index.d.ts",
   "scripts": {
     "build": "tsc && rollup -c rollup.config.js",
     "build:grpc": "protoc --ts_out proto/generated --ts_opt generate_dependencies --ts_opt client_generic --proto_path proto core.proto && yarn patch:grpc",
     "patch:grpc": "node scripts/patch-esm-grpc.js",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch",
+    "test:coverage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
     "gen-proto": "protoc -I=./proto --ts_out=proto/generated ./proto/core.proto",
-    "lint": "ts-standard --fix"
+    "lint": "ts-standard --fix --project ./tsconfig.eslint.json"
   },
   "type": "module",
   "author": "",
@@ -50,8 +44,6 @@
     "@protobuf-ts/grpcweb-transport": "^2.11.1",
     "@scure/base": "^2.0.0",
     "@scure/btc-signer": "^2.0.1",
-    "@types/ripemd160": "^2.0.3",
-    "@types/sha.js": "^2.4.4",
     "bloom-filter": "^0.2.0",
     "imurmurhash": "^0.1.4",
     "protoc": "^32.1.0",
