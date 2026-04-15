@@ -55,27 +55,18 @@ export class DashCoreSDK {
     constructor(options = {}) {
         this.network = options.network ?? 'testnet';
         this.grpcConnectionPool = new GRPCConnectionPool(this.network, {
-            dapiUrl: options.dapiUrl ?? (this.network === 'mainnet' ? 'http://127.0.0.1:443' : 'http://127.0.0.1:1443'),
+            dapiUrl: options.dapiUrl,
             poolLimit: options.poolLimit ?? 5
         });
     }
     getNetworkType() {
         return this.network === 'mainnet' ? Network.Mainnet : Network.Testnet;
     }
-    getPaymentAmount(amount) {
-        if (!Number.isSafeInteger(amount) || amount < 0) {
-            throw new Error('Amount must be a non-negative safe integer');
-        }
-        return BigInt(amount);
-    }
     getOutputAddress(output) {
         return output.script.getAddress(this.getNetworkType());
     }
     outputMatchesPayment(output, address, amount) {
         return output.satoshis >= amount && this.getOutputAddress(output) === address;
-    }
-    transactionMatchesPayment(transaction, address, amount) {
-        return transaction.outputs.some(output => this.outputMatchesPayment(output, address, amount));
     }
     async getVerifiedTransaction(txid) {
         try {
@@ -95,7 +86,11 @@ export class DashCoreSDK {
         if (transactionInfo == null || !transactionInfo.dapiTransaction.isChainLocked) {
             return undefined;
         }
-        if (!this.transactionMatchesPayment(transactionInfo.transaction, address, amount)) {
+        const transactionMatchesPayment = transactionInfo
+            .transaction
+            .outputs
+            .some(output => this.outputMatchesPayment(output, address, amount));
+        if (!transactionMatchesPayment) {
             return undefined;
         }
         return {
@@ -188,7 +183,8 @@ export class DashCoreSDK {
     }
     async getEstimatedTransactionFee(blocks) {
         const client = this.grpcConnectionPool.getClient();
-        return (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks }))).response;
+        const { response } = (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks })));
+        return response.fee;
     }
     /**
      * Builds a Core-level instant asset lock proof payload.
@@ -255,8 +251,7 @@ export class DashCoreSDK {
         //
         // return stream
     }
-    async waitForIncomingTransaction(address, amount = 1000) {
-        const paymentAmount = this.getPaymentAmount(amount);
+    async waitForIncomingTransaction(address, amount = 1000n) {
         const pendingTransactions = new Map();
         const pendingInstantLocks = new Map();
         const iterator = this.subscribeToTransactions([address]);
@@ -265,7 +260,7 @@ export class DashCoreSDK {
                 case 'rawMerkleBlock': {
                     await wait(5000);
                     for (const txid of pendingTransactions.keys()) {
-                        const paymentInfo = await this.getChainLockedPaymentInfo(txid, address, paymentAmount);
+                        const paymentInfo = await this.getChainLockedPaymentInfo(txid, address, amount);
                         if (paymentInfo != null) {
                             return paymentInfo;
                         }
@@ -274,7 +269,10 @@ export class DashCoreSDK {
                 }
                 case 'rawTransaction': {
                     const transaction = Transaction.fromBytes(hexToBytes(event.data));
-                    if (!this.transactionMatchesPayment(transaction, address, paymentAmount)) {
+                    const transactionMatchesPayment = transaction
+                        .outputs
+                        .some(output => this.outputMatchesPayment(output, address, amount));
+                    if (!transactionMatchesPayment) {
                         break;
                     }
                     const txid = transaction.hash();

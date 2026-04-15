@@ -4502,20 +4502,6 @@
         ExtraPayloadType[ExtraPayloadType["AssetLockTx"] = 7] = "AssetLockTx";
         ExtraPayloadType[ExtraPayloadType["AssetUnlockTx"] = 8] = "AssetUnlockTx";
     })(ExtraPayloadType || (ExtraPayloadType = {}));
-    const seedNodes$1 = {
-        testnet: [
-            // seed-1.pshenmic.dev
-            'https://158.160.14.115:1443'
-        ],
-        mainnet: [
-            // seed-1.pshenmic.dev
-            'https://158.160.14.115:443'
-            // mainnet dcg seeds
-            // 'https://158.160.14.115',
-            // 'https://3.0.60.103',
-            // 'https://34.211.174.194'
-        ]
-    };
 
     /**
      * Utilities for hex, bytes, CSPRNG.
@@ -21149,7 +21135,7 @@
         constructor(options = {}) {
             this.network = options.network ?? 'testnet';
             this.grpcConnectionPool = new GRPCConnectionPool(this.network, {
-                dapiUrl: options.dapiUrl ?? seedNodes$1[this.network],
+                dapiUrl: options.dapiUrl,
                 poolLimit: options.poolLimit ?? 5
             });
         }

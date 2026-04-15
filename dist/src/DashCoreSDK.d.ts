@@ -1,5 +1,5 @@
 import GRPCConnectionPool from './grpcConnectionPool.js';
-import { BlockHeadersWithChainLocksResponse, BroadcastTransactionResponse, GetBestBlockHeightResponse, GetBlockchainStatusResponse, GetBlockResponse, GetEstimatedTransactionFeeResponse, GetMasternodeStatusResponse, MasternodeListRequest, type MasternodeListResponse, TransactionsWithProofsRequest, type TransactionsWithProofsResponse } from '../proto/generated/core.js';
+import { BlockHeadersWithChainLocksResponse, BroadcastTransactionResponse, GetBestBlockHeightResponse, GetBlockchainStatusResponse, GetBlockResponse, GetMasternodeStatusResponse, MasternodeListRequest, type MasternodeListResponse, TransactionsWithProofsRequest, type TransactionsWithProofsResponse } from '../proto/generated/core.js';
 import { Transaction } from './types/Transaction.js';
 import { InstantLock } from './types/InstantLock.js';
 import { OutPoint } from './types/OutPoint.js';
@@ -103,10 +103,8 @@ export declare class DashCoreSDK {
         poolLimit?: number;
     });
     private getNetworkType;
-    private getPaymentAmount;
     private getOutputAddress;
     private outputMatchesPayment;
-    private transactionMatchesPayment;
     private getVerifiedTransaction;
     private getChainLockedPaymentInfo;
     private normalizeTransactionBytes;
@@ -122,7 +120,7 @@ export declare class DashCoreSDK {
     }): Promise<GetBlockResponse>;
     getBestBlockHeight(): Promise<GetBestBlockHeightResponse>;
     broadcastTransaction(transaction: Uint8Array, allowHighFees?: boolean, bypassLimits?: boolean): Promise<BroadcastTransactionResponse>;
-    getEstimatedTransactionFee(blocks: number): Promise<GetEstimatedTransactionFeeResponse>;
+    getEstimatedTransactionFee(blocks: number): Promise<number>;
     /**
      * Builds a Core-level instant asset lock proof payload.
      * This uses a numeric `type` field and is not directly compatible
@@ -138,7 +136,7 @@ export declare class DashCoreSDK {
     toInstantAssetLockProofParams(proof: InstantAssetLockProof): InstantAssetLockProofParams;
     toChainAssetLockProofParams(proof: ChainAssetLockProof): ChainAssetLockProofParams;
     subscribeToBlockHeadersWithChainLocks(count?: number, fromBlockHash?: Uint8Array, fromBlockHeight?: number): AsyncIterable<BlockHeadersWithChainLocksResponse>;
-    waitForIncomingTransaction(address: string, amount?: number): Promise<PaymentInfo>;
+    waitForIncomingTransaction(address: string, amount?: bigint): Promise<PaymentInfo>;
     subscribeToTransactions(addresses: string[]): AsyncIterable<SubscribeToTransactionsEvent>;
     subscribeToTransactionsWithProofs(bloomFilter: BloomFilter, count: number, sendTransactionHashes: boolean, fromBlockHash?: Uint8Array, fromBlockHeight?: number, abortController?: AbortController): ServerStreamingCall<TransactionsWithProofsRequest, TransactionsWithProofsResponse>;
     subscribeToMasternodeList(): ServerStreamingCall<MasternodeListRequest, MasternodeListResponse>;
