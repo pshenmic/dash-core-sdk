@@ -392,18 +392,3 @@ export enum ExtraPayloadType {
   'AssetLockTx' = 7,
   'AssetUnlockTx' = 8
 }
-
-export const seedNodes = {
-  testnet: [
-    // seed-1.pshenmic.dev
-    'https://158.160.14.115:1443'
-  ],
-  mainnet: [
-    // seed-1.pshenmic.dev
-    'https://158.160.14.115:443'
-    // mainnet dcg seeds
-    // 'https://158.160.14.115',
-    // 'https://3.0.60.103',
-    // 'https://34.211.174.194'
-  ]
-}
