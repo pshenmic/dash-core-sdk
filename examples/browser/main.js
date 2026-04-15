@@ -1,4 +1,4 @@
-import { DashCoreSDK } from '../../dist/browser.js'
+import { DashCoreSDK } from '../../dist/bundle.es6.js'
 
 const output = document.getElementById('output')
 const networkSelect = document.getElementById('network')
@@ -23,9 +23,9 @@ const buildSdk = () => {
 }
 
 const getPaymentAmount = () => {
-  const amount = Number(paymentAmountInput.value.trim())
+  const amount = BigInt(paymentAmountInput.value.trim())
 
-  if (!Number.isSafeInteger(amount) || amount < 0) {
+  if (amount < 0n) {
     throw new Error('Amount must be a non-negative integer in satoshis')
   }
 
