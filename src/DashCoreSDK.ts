@@ -17,7 +17,10 @@ import {
   TransactionsWithProofsRequest, type TransactionsWithProofsResponse
 } from '../proto/generated/core.js'
 import bloomFilter from 'bloom-filter'
-import { BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, Network, TransactionType } from './constants.js'
+import {
+  BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, Network,
+  seedNodes, TransactionType
+} from './constants.js'
 import { addressToPublicKeyHash, bytesToHex, hexToBytes, wait } from './utils.js'
 import { p2pkh } from '@scure/btc-signer'
 import * as secp from '@noble/secp256k1'
@@ -144,7 +147,7 @@ export class DashCoreSDK {
   constructor (options: { network?: 'mainnet' | 'testnet', dapiUrl?: string, poolLimit?: number } = {}) {
     this.network = options.network ?? 'testnet'
     this.grpcConnectionPool = new GRPCConnectionPool(this.network, {
-      dapiUrl: options.dapiUrl ?? (this.network === 'mainnet' ? 'http://127.0.0.1:443' : 'http://127.0.0.1:1443'),
+      dapiUrl: options.dapiUrl ?? seedNodes[this.network],
       poolLimit: options.poolLimit ?? 5
     })
   }
