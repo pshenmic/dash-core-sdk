@@ -310,11 +310,12 @@ export class DashCoreSDK {
     }))).response
   }
 
-  // TODO: return number
-  async getEstimatedTransactionFee (blocks: number): Promise<GetEstimatedTransactionFeeResponse> {
+  async getEstimatedTransactionFee (blocks: number): Promise<number> {
     const client = this.grpcConnectionPool.getClient()
 
-    return (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks }))).response
+    const {response} = (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks })))
+
+    return response.fee
   }
 
 
