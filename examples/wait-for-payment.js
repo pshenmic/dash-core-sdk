@@ -14,7 +14,7 @@ const sdk = new DashCoreSDK({
 async function main () {
   const address = PAYMENT_ADDRESS ?? (await sdk.generateAddress()).address
 
-  console.log('Waiting for payment')
+  console.log('Waiting for incoming transaction')
   console.log({
     network: NETWORK,
     dapiUrl: DAPI_URL,
@@ -26,7 +26,7 @@ async function main () {
     console.log('Send funds to the generated address above and keep this process running.')
   }
 
-  const payment = await sdk.waitForPayment(address, PAYMENT_AMOUNT_SATOSHIS)
+  const payment = await sdk.waitForIncomingTransaction(address, PAYMENT_AMOUNT_SATOSHIS)
 
   console.log('Payment detected')
   console.log(payment)

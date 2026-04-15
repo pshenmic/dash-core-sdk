@@ -13,7 +13,10 @@ import { PrivateKey } from './src/types/PrivateKey.js'
 import { PublicKey } from './src/types/PublicKey.js'
 import { Script } from './src/types/Script.js'
 import { Transaction } from './src/types/Transaction.js'
+import { Network, TransactionType } from './src/constants.js'
 import * as utils from './src/utils.js'
+
+export type { TransactionInputToSign } from './src/types/Transaction.js'
 
 export {
   DashCoreSDK,
@@ -27,6 +30,7 @@ export {
   InstantLock,
   MerkleBlock,
   MerkleTree,
+  Network,
   OutPoint,
   Output,
   PrivateKey,
@@ -34,18 +38,17 @@ export {
   Script,
   Transaction,
   TransactionJSON,
+  TransactionType,
   utils
 }
 
 export type {
-  AssetLockCreditOutput,
-  AssetLockSpendableUtxo,
   BloomFilter,
   ChainAssetLockProof,
-  CreateAssetLockTransactionOptions,
-  CreateAssetLockTransactionFromPaymentOptions,
+  ChainAssetLockProofParams,
   CoreKeyPair,
   InstantAssetLockProof,
+  InstantAssetLockProofParams,
   PaymentInfo,
   SubscribeToTransactionsEvent
 } from './src/DashCoreSDK.js'

@@ -6,6 +6,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "esModuleInterop": false,
+    "ignoreDeprecations": "5.0",
     "declaration": true,
     "strictNullChecks": true,
     "emitDeclarationOnly": false

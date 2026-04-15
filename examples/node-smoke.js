@@ -111,8 +111,8 @@ async function main () {
   }
 
   if (PAYMENT_ADDRESS) {
-    console.log('--- waitForPayment ---')
-    console.log(await sdk.waitForPayment(PAYMENT_ADDRESS))
+    console.log('--- waitForIncomingTransaction ---')
+    console.log(await sdk.waitForIncomingTransaction(PAYMENT_ADDRESS))
   }
 
   console.log('DONE')

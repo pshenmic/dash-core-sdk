@@ -95,14 +95,14 @@ waitForPaymentButton.addEventListener('click', async () => {
       network: networkSelect.value,
       address,
       amountSatoshis,
-      note: 'waitForPayment listens only for new payment events after start'
+      note: 'waitForIncomingTransaction listens only for new payment events after start'
     })
 
-    const payment = await sdk.waitForPayment(address, amountSatoshis)
+    const payment = await sdk.waitForIncomingTransaction(address, amountSatoshis)
 
     log('Payment detected', payment)
   } catch (error) {
-    log('waitForPayment failed', {
+    log('waitForIncomingTransaction failed', {
       dapiUrl: dapiUrlInput.value.trim(),
       network: networkSelect.value,
       address: paymentAddressInput.value.trim(),
