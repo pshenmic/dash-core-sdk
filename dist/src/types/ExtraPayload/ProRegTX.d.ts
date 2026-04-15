@@ -1,0 +1,30 @@
+import { OutPoint } from '../OutPoint.js';
+import { Script } from '../Script.js';
+import { NetworkLike, ProRegTxJSON } from '../../types.js';
+export declare class ProRegTX {
+    version: number;
+    type: number;
+    mode: number;
+    collateralOutpoint: OutPoint;
+    ipAddress: string;
+    port: number;
+    keyIdOwner: string;
+    keyIdVoting: string;
+    pubKeyOperator: string;
+    operatorReward: number;
+    scriptPayout: Script;
+    inputsHash: string;
+    platformNodeID?: string;
+    platformP2PPort?: number;
+    platformHTTPPort?: number;
+    payloadSig: string;
+    constructor(version: number, type: number, mode: number, collateralOutpoint: OutPoint, ipAddress: string, port: number, /* netInfo: Uint8Array, */ keyIdOwner: string, pubKeyOperator: string, keyIdVoting: string, operatorReward: number, scriptPayout: Script, inputsHash: string, platformNodeID: string, platformP2PPort: number, platformHTTPPort: number, payloadSig: string);
+    getOwnerAddress(network?: NetworkLike): string;
+    getVotingAddress(network?: NetworkLike): string;
+    getPayoutAddress(network?: NetworkLike): string | undefined;
+    static fromBytes(bytes: Uint8Array): ProRegTX;
+    static fromHex(hex: string): ProRegTX;
+    bytes(): Uint8Array;
+    hex(): string;
+    toJSON(): ProRegTxJSON;
+}
