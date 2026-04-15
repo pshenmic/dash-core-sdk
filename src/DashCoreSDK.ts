@@ -10,7 +10,6 @@ import {
   GetBlockRequest,
   GetBlockResponse,
   GetEstimatedTransactionFeeRequest,
-  GetEstimatedTransactionFeeResponse,
   GetMasternodeStatusRequest,
   GetMasternodeStatusResponse,
   GetTransactionRequest,
