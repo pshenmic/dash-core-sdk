@@ -154,25 +154,12 @@ export class DashCoreSDK {
     return this.network === 'mainnet' ? Network.Mainnet : Network.Testnet
   }
 
-  private getPaymentAmount (amount: number): bigint {
-    if (!Number.isSafeInteger(amount) || amount < 0) {
-      throw new Error('Amount must be a non-negative safe integer')
-    }
-
-    return BigInt(amount)
-  }
-
-
   private getOutputAddress (output: Output): string | undefined {
     return output.script.getAddress(this.getNetworkType())
   }
 
   private outputMatchesPayment (output: Output, address: string, amount: bigint): boolean {
     return output.satoshis >= amount && this.getOutputAddress(output) === address
-  }
-
-  private transactionMatchesPayment (transaction: Transaction, address: string, amount: bigint): boolean {
-    return transaction.outputs.some(output => this.outputMatchesPayment(output, address, amount))
   }
 
   private async getVerifiedTransaction (txid: string): Promise<{ dapiTransaction: DapiTransaction, transaction: Transaction } | undefined> {
@@ -197,7 +184,12 @@ export class DashCoreSDK {
       return undefined
     }
 
-    if (!this.transactionMatchesPayment(transactionInfo.transaction, address, amount)) {
+    const transactionMatchesPayment = transactionInfo
+      .transaction
+      .outputs
+      .some(output => this.outputMatchesPayment(output, address, amount))
+
+    if (!transactionMatchesPayment) {
       return undefined
     }
 
@@ -318,6 +310,7 @@ export class DashCoreSDK {
     }))).response
   }
 
+  // TODO: return number
   async getEstimatedTransactionFee (blocks: number): Promise<GetEstimatedTransactionFeeResponse> {
     const client = this.grpcConnectionPool.getClient()
 
@@ -401,8 +394,7 @@ export class DashCoreSDK {
     // return stream
   }
 
-  async waitForIncomingTransaction (address: string, amount: number = 1000): Promise<PaymentInfo> {
-    const paymentAmount = this.getPaymentAmount(amount)
+  async waitForIncomingTransaction (address: string, amount: bigint = 1000n): Promise<PaymentInfo> {
     const pendingTransactions = new Map<string, Transaction>()
     const pendingInstantLocks = new Map<string, string>()
 
@@ -414,7 +406,7 @@ export class DashCoreSDK {
           await wait(5000)
 
           for (const txid of pendingTransactions.keys()) {
-            const paymentInfo = await this.getChainLockedPaymentInfo(txid, address, paymentAmount)
+            const paymentInfo = await this.getChainLockedPaymentInfo(txid, address, amount)
 
             if (paymentInfo != null) {
               return paymentInfo
@@ -425,7 +417,11 @@ export class DashCoreSDK {
         case 'rawTransaction': {
           const transaction = Transaction.fromBytes(hexToBytes(event.data))
 
-          if (!this.transactionMatchesPayment(transaction, address, paymentAmount)) {
+          const transactionMatchesPayment = transaction
+            .outputs
+            .some(output => this.outputMatchesPayment(output, address, amount))
+
+          if (!transactionMatchesPayment) {
             break
           }
 
