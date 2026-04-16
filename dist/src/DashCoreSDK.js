@@ -303,11 +303,14 @@ export class DashCoreSDK {
         }
         throw new Error('Unreachable code block in waitForIncomingTransaction');
     }
-    async *subscribeToTransactions(addresses) {
-        const numberOfElements = Math.max(addresses.length, 1);
+    async *subscribeToTransactions(addresses, extraFilterData = []) {
+        const numberOfElements = Math.max(addresses.length + extraFilterData.length, 1);
         const bf = bloomFilter.create(numberOfElements, BLOOM_FILTER_FALSE_POSITIVE_RATE, 0, 1);
         for (const address of addresses) {
             bf.insert(addressToPublicKeyHash(address));
+        }
+        for (const data of extraFilterData) {
+            bf.insert(data);
         }
         // subscribe to new transactions
         const count = 0;
@@ -357,7 +360,7 @@ export class DashCoreSDK {
         catch (e) {
             const message = e instanceof Error ? e.message : undefined;
             if (message === reconnectReason || abortController.signal.reason === reconnectReason) {
-                return yield* this.subscribeToTransactions(addresses);
+                return yield* this.subscribeToTransactions(addresses, extraFilterData);
             }
             throw e;
         }

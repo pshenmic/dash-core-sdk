@@ -137,7 +137,7 @@ export declare class DashCoreSDK {
     toChainAssetLockProofParams(proof: ChainAssetLockProof): ChainAssetLockProofParams;
     subscribeToBlockHeadersWithChainLocks(count?: number, fromBlockHash?: Uint8Array, fromBlockHeight?: number): AsyncIterable<BlockHeadersWithChainLocksResponse>;
     waitForIncomingTransaction(address: string, amount?: bigint): Promise<PaymentInfo>;
-    subscribeToTransactions(addresses: string[]): AsyncIterable<SubscribeToTransactionsEvent>;
+    subscribeToTransactions(addresses: string[], extraFilterData?: Uint8Array[]): AsyncIterable<SubscribeToTransactionsEvent>;
     subscribeToTransactionsWithProofs(bloomFilter: BloomFilter, count: number, sendTransactionHashes: boolean, fromBlockHash?: Uint8Array, fromBlockHeight?: number, abortController?: AbortController): ServerStreamingCall<TransactionsWithProofsRequest, TransactionsWithProofsResponse>;
     subscribeToMasternodeList(): ServerStreamingCall<MasternodeListRequest, MasternodeListResponse>;
 }
