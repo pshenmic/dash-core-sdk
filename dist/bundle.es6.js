@@ -21379,7 +21379,7 @@ class DashCoreSDK {
     }
     async *subscribeToTransactions(addresses) {
         const numberOfElements = Math.max(addresses.length, 1);
-        const bf = bloomFilter.create(numberOfElements, BLOOM_FILTER_FALSE_POSITIVE_RATE);
+        const bf = bloomFilter.create(numberOfElements, BLOOM_FILTER_FALSE_POSITIVE_RATE, 0, 1);
         for (const address of addresses) {
             bf.insert(addressToPublicKeyHash(address));
         }
