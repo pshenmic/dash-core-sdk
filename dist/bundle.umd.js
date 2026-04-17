@@ -21385,7 +21385,7 @@
         }
         async *subscribeToTransactions(addresses, extraFilterData = []) {
             const numberOfElements = Math.max(addresses.length + extraFilterData.length, 1);
-            const bf = bloomFilter.create(numberOfElements, BLOOM_FILTER_FALSE_POSITIVE_RATE, 0, 1);
+            const bf = bloomFilter.create(numberOfElements, BLOOM_FILTER_FALSE_POSITIVE_RATE);
             for (const address of addresses) {
                 bf.insert(addressToPublicKeyHash(address));
             }
