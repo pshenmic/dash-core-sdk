@@ -82,8 +82,8 @@ export interface CoreKeyPair {
 
 export interface InstantAssetLockProof {
   type: 0
-  instantLock: Uint8Array
-  transaction: Uint8Array
+  instantLock: InstantLock
+  transaction: Transaction
   outputIndex: number
 }
 
@@ -202,53 +202,6 @@ export class DashCoreSDK {
   }
 
 
-  private normalizeTransactionBytes (transaction: Transaction | Uint8Array | string): Uint8Array {
-    if (transaction instanceof Transaction) {
-      return transaction.bytes()
-    }
-
-    if (typeof transaction === 'string') {
-      return hexToBytes(transaction)
-    }
-
-    return transaction
-  }
-
-  private normalizeInstantLockBytes (instantLock: InstantLock | Uint8Array | string): Uint8Array {
-    if (instantLock instanceof InstantLock) {
-      return instantLock.bytes()
-    }
-
-    if (typeof instantLock === 'string') {
-      return hexToBytes(instantLock)
-    }
-
-    return instantLock
-  }
-
-  private getAssetLockTransactionProofData (transaction: Transaction | Uint8Array | string, outputIndex: number): { transactionBytes: Uint8Array, transactionObject: Transaction, txid: string } {
-    if (!Number.isSafeInteger(outputIndex) || outputIndex < 0) {
-      throw new Error('outputIndex must be a non-negative safe integer')
-    }
-
-    const transactionBytes = this.normalizeTransactionBytes(transaction)
-    const transactionObject = Transaction.fromBytes(transactionBytes)
-
-    if (transactionObject.type !== TransactionType.TRANSACTION_ASSET_LOCK || !(transactionObject.extraPayload instanceof AssetLockTx)) {
-      throw new Error('Asset lock proof requires an asset lock transaction')
-    }
-
-    if (outputIndex >= transactionObject.extraPayload.outputs.length) {
-      throw new Error(`outputIndex must be lower than the number of asset lock credit outputs (${transactionObject.extraPayload.outputs.length})`)
-    }
-
-    return {
-      transactionBytes,
-      transactionObject,
-      txid: transactionObject.hash()
-    }
-  }
-
   async generateAddress (): Promise<CoreKeyPair> {
     const { secretKey, publicKey } = secp.keygen()
     const networkType = this.getNetworkType()
@@ -326,20 +279,25 @@ export class DashCoreSDK {
    * This uses a numeric `type` field and is not directly compatible
    * with dash-platform-sdk identity create parameters.
    */
-  createInstantAssetLockProof (transaction: Transaction | Uint8Array | string, instantLock: InstantLock | Uint8Array | string, outputIndex: number = 0): InstantAssetLockProof {
-    const { transactionBytes, txid } = this.getAssetLockTransactionProofData(transaction, outputIndex)
+  createInstantAssetLockProof (transaction: Transaction, instantLock: InstantLock, outputIndex: number = 0): InstantAssetLockProof {
+    if (transaction.type !== TransactionType.TRANSACTION_ASSET_LOCK || !(transaction.extraPayload instanceof AssetLockTx)) {
+      throw new Error('Asset lock proof requires an asset lock transaction')
+    }
 
-    const instantLockBytes = this.normalizeInstantLockBytes(instantLock)
-    const instantLockObject = InstantLock.fromBytes(instantLockBytes)
+    if (outputIndex >= transaction.extraPayload.outputs.length) {
+      throw new Error(`outputIndex must be lower than the number of asset lock credit outputs (${transaction.extraPayload.outputs.length})`)
+    }
 
-    if (instantLockObject.txId !== txid) {
-      throw new Error(`InstantLock txid ${instantLockObject.txId} does not match transaction txid ${txid}`)
+    const txid = transaction.hash()
+
+    if (instantLock.txId !== txid) {
+      throw new Error(`InstantLock txid ${instantLock.txId} does not match transaction txid ${txid}`)
     }
 
     return {
       type: 0,
-      instantLock: instantLockBytes,
-      transaction: transactionBytes,
+      instantLock,
+      transaction,
       outputIndex
     }
   }
@@ -349,25 +307,31 @@ export class DashCoreSDK {
    * This uses a numeric `type` field and is not directly compatible
    * with dash-platform-sdk identity create parameters.
    */
-  createChainAssetLockProof (transaction: Transaction | Uint8Array | string, coreChainLockedHeight: number, outputIndex: number = 0): ChainAssetLockProof {
+  createChainAssetLockProof (transaction: Transaction, coreChainLockedHeight: number, outputIndex: number = 0): ChainAssetLockProof {
     if (!Number.isSafeInteger(coreChainLockedHeight) || coreChainLockedHeight < 0) {
       throw new Error('coreChainLockedHeight must be a non-negative safe integer')
     }
 
-    const { txid } = this.getAssetLockTransactionProofData(transaction, outputIndex)
+    if (transaction.type !== TransactionType.TRANSACTION_ASSET_LOCK || !(transaction.extraPayload instanceof AssetLockTx)) {
+      throw new Error('Asset lock proof requires an asset lock transaction')
+    }
+
+    if (outputIndex >= transaction.extraPayload.outputs.length) {
+      throw new Error(`outputIndex must be lower than the number of asset lock credit outputs (${transaction.extraPayload.outputs.length})`)
+    }
 
     return {
       type: 1,
       coreChainLockedHeight,
-      outPoint: new OutPoint(txid, outputIndex)
+      outPoint: new OutPoint(transaction.hash(), outputIndex)
     }
   }
 
   toInstantAssetLockProofParams (proof: InstantAssetLockProof): InstantAssetLockProofParams {
     return {
       type: 'instantLock',
-      instantLock: bytesToHex(proof.instantLock),
-      transaction: bytesToHex(proof.transaction),
+      instantLock: proof.instantLock.hex(),
+      transaction: proof.transaction.hex(),
       outputIndex: proof.outputIndex
     }
   }

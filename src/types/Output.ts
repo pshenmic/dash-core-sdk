@@ -45,7 +45,7 @@ export class Output {
     return output
   }
 
-  static createAssetLockBurn (satoshis: bigint): Output {
+  static createAssetLock (satoshis: bigint): Output {
     const script = new Script()
 
     script.pushOpCode('OP_RETURN')

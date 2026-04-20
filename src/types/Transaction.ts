@@ -191,12 +191,6 @@ export class Transaction {
     }
   }
 
-  signInputs (inputs: TransactionInputToSign[]): void {
-    for (const input of inputs) {
-      this.#signInput(input.privateKey, input.inputIndex, input.lockingScript)
-    }
-  }
-
   generateChange (address: string, inputAmount: bigint): void {
     if (this.inputs.length === 0) {
       throw new Error('Before call generateChange you must set all inputs')
