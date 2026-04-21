@@ -1,4 +1,7 @@
 import { DashCoreSDK } from '../dist/index.js'
+import {createAssetLockProof} from "../src/utils.ts";
+import {InstantLock} from "../src/DashCoreSDK.ts";
+import {Transaction} from "@scure/btc-signer";
 
 const NETWORK = 'testnet'
 const DAPI_URL = 'https://158.160.14.115:1443'
@@ -27,10 +30,12 @@ async function main () {
   })
 
   if (!INSTANT_LOCK_HEX.startsWith('REPLACE_')) {
-    const instantProof = sdk.createInstantAssetLockProof(
-      ASSET_LOCK_TRANSACTION_HEX,
-      INSTANT_LOCK_HEX,
-      OUTPUT_INDEX
+    const instantProof = createAssetLockProof(
+      {
+        transaction: Transaction.fromHex(ASSET_LOCK_TRANSACTION_HEX),
+        instantLock: InstantLock.fromHex(INSTANT_LOCK_HEX),
+        outputIndex: OUTPUT_INDEX
+      }
     )
 
     console.log('Instant asset lock proof')

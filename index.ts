@@ -46,10 +46,3 @@ export type {
   PaymentInfo,
   SubscribeToTransactionsEvent
 } from './src/DashCoreSDK.js'
-
-export type {
-  InstantAssetLockProofParams,
-  ChainAssetLockProofParams,
-  InstantAssetLockProofData,
-  ChainAssetLockProofData
-} from './src/utilsController.js'
