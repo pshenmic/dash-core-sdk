@@ -27,8 +27,6 @@ import * as secp from '@noble/secp256k1'
 import { PrivateKey } from './types/PrivateKey.js'
 import { Transaction } from './types/Transaction.js'
 import { InstantLock } from './types/InstantLock.js'
-import { OutPoint } from './types/OutPoint.js'
-import { Output } from './types/Output.js'
 import type { ServerStreamingCall } from '@protobuf-ts/runtime-rpc'
 import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './types/ExtraPayload/AssetUnlockTx.js'
@@ -77,20 +75,6 @@ export interface PaymentInfo {
 export interface CoreKeyPair {
   address: string
   wif: string
-}
-
-
-export interface InstantAssetLockProof {
-  type: 0
-  instantLock: InstantLock
-  transaction: Transaction
-  outputIndex: number
-}
-
-export interface ChainAssetLockProof {
-  type: 1
-  coreChainLockedHeight: number
-  outPoint: OutPoint
 }
 
 export interface InstantAssetLockProofParams {
@@ -156,14 +140,6 @@ export class DashCoreSDK {
     return this.network === 'mainnet' ? Network.Mainnet : Network.Testnet
   }
 
-  private getOutputAddress (output: Output): string | undefined {
-    return output.script.getAddress(this.getNetworkType())
-  }
-
-  private outputMatchesPayment (output: Output, address: string, amount: bigint): boolean {
-    return output.satoshis >= amount && this.getOutputAddress(output) === address
-  }
-
   private async getVerifiedTransaction (txid: string): Promise<{ dapiTransaction: DapiTransaction, transaction: Transaction } | undefined> {
     try {
       const dapiTransaction = await this.getTransaction(txid)
@@ -189,7 +165,7 @@ export class DashCoreSDK {
     const transactionMatchesPayment = transactionInfo
       .transaction
       .outputs
-      .some(output => this.outputMatchesPayment(output, address, amount))
+      .some(output => output.satoshis >= amount && output.script.getAddress(this.getNetworkType()) === address)
 
     if (!transactionMatchesPayment) {
       return undefined
@@ -200,7 +176,6 @@ export class DashCoreSDK {
       chainLocked: transactionInfo.dapiTransaction.height
     }
   }
-
 
   async generateAddress (): Promise<CoreKeyPair> {
     const { secretKey, publicKey } = secp.keygen()
@@ -273,13 +248,7 @@ export class DashCoreSDK {
     return response.fee
   }
 
-
-  /**
-   * Builds a Core-level instant asset lock proof payload.
-   * This uses a numeric `type` field and is not directly compatible
-   * with dash-platform-sdk identity create parameters.
-   */
-  createInstantAssetLockProof (transaction: Transaction, instantLock: InstantLock, outputIndex: number = 0): InstantAssetLockProof {
+  createInstantAssetLockProof (transaction: Transaction, instantLock: InstantLock, outputIndex: number = 0): InstantAssetLockProofParams {
     if (transaction.type !== TransactionType.TRANSACTION_ASSET_LOCK || !(transaction.extraPayload instanceof AssetLockTx)) {
       throw new Error('Asset lock proof requires an asset lock transaction')
     }
@@ -295,19 +264,14 @@ export class DashCoreSDK {
     }
 
     return {
-      type: 0,
-      instantLock,
-      transaction,
+      type: 'instantLock',
+      instantLock: instantLock.hex(),
+      transaction: transaction.hex(),
       outputIndex
     }
   }
 
-  /**
-   * Builds a Core-level chain asset lock proof payload.
-   * This uses a numeric `type` field and is not directly compatible
-   * with dash-platform-sdk identity create parameters.
-   */
-  createChainAssetLockProof (transaction: Transaction, coreChainLockedHeight: number, outputIndex: number = 0): ChainAssetLockProof {
+  createChainAssetLockProof (transaction: Transaction, coreChainLockedHeight: number, outputIndex: number = 0): ChainAssetLockProofParams {
     if (!Number.isSafeInteger(coreChainLockedHeight) || coreChainLockedHeight < 0) {
       throw new Error('coreChainLockedHeight must be a non-negative safe integer')
     }
@@ -321,27 +285,10 @@ export class DashCoreSDK {
     }
 
     return {
-      type: 1,
-      coreChainLockedHeight,
-      outPoint: new OutPoint(transaction.hash(), outputIndex)
-    }
-  }
-
-  toInstantAssetLockProofParams (proof: InstantAssetLockProof): InstantAssetLockProofParams {
-    return {
-      type: 'instantLock',
-      instantLock: proof.instantLock.hex(),
-      transaction: proof.transaction.hex(),
-      outputIndex: proof.outputIndex
-    }
-  }
-
-  toChainAssetLockProofParams (proof: ChainAssetLockProof): ChainAssetLockProofParams {
-    return {
       type: 'chainLock',
-      txid: proof.outPoint.txId,
-      outputIndex: proof.outPoint.vOut,
-      coreChainLockedHeight: proof.coreChainLockedHeight
+      txid: transaction.hash(),
+      outputIndex,
+      coreChainLockedHeight
     }
   }
 
@@ -386,7 +333,7 @@ export class DashCoreSDK {
 
           const transactionMatchesPayment = transaction
             .outputs
-            .some(output => this.outputMatchesPayment(output, address, amount))
+            .some(output => output.satoshis >= amount && output.script.getAddress(this.getNetworkType()) === address)
 
           if (!transactionMatchesPayment) {
             break

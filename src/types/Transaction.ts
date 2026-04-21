@@ -123,7 +123,7 @@ export class Transaction {
     return undefined
   }
 
-  #signInput (privateKey: PrivateKey, inputIndex: number, lockingScript?: Script): void {
+  #signInput (privateKey: PrivateKey, inputIndex: number): void {
     if (this.inputs.length <= inputIndex) {
       throw new Error(`input with not found (index: ${inputIndex})`)
     }
@@ -139,8 +139,6 @@ export class Transaction {
     for (let i = 0; i < this.inputs.length; i++) {
       if (i !== inputIndex) {
         this.inputs[i].scriptSig = new Script()
-      } else {
-        this.inputs[i].scriptSig = lockingScript != null ? new Script(lockingScript) : new Script(savedInputs[i].scriptSig)
       }
     }
 
@@ -187,7 +185,7 @@ export class Transaction {
   // TODO: MultiSig
   sign (privateKey: PrivateKey): void {
     for (let i = 0; i < this.inputs.length; i++) {
-      this.#signInput(privateKey, i, this.inputs[i].scriptSig)
+      this.#signInput(privateKey, i)
     }
   }
 

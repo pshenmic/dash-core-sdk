@@ -44,10 +44,8 @@ export {
 
 export type {
   BloomFilter,
-  ChainAssetLockProof,
   ChainAssetLockProofParams,
   CoreKeyPair,
-  InstantAssetLockProof,
   InstantAssetLockProofParams,
   PaymentInfo,
   SubscribeToTransactionsEvent
