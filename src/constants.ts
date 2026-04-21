@@ -28,7 +28,7 @@ export const SIGNED_INPUT_MAX_SIZE = 32 + 4 + 8 + 108 + 4
  */
 export const CHANGE_OUTPUT_MAX_SIZE = 20 + 4 + 34 + 4
 
-export const enum TransactionType {
+export enum TransactionType {
   TRANSACTION_NORMAL = 0,
   TRANSACTION_PROVIDER_REGISTER = 1,
   TRANSACTION_PROVIDER_UPDATE_SERVICE = 2,
@@ -381,7 +381,7 @@ export const MAX_BLOOM_FILTER_FUNC_COUNT = 50
 export const BLOOM_FILTER_FBA_CONSTANT = 0xfba4c795
 export const BLOOM_FILTER_FALSE_POSITIVE_RATE = 0.0001
 
-export const enum ExtraPayloadType {
+export enum ExtraPayloadType {
   'ProRegTx' = 0,
   'ProUpServTx' = 1,
   'ProUpRegTx' = 2,

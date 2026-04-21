@@ -10,7 +10,6 @@ import {
   GetBlockRequest,
   GetBlockResponse,
   GetEstimatedTransactionFeeRequest,
-  GetEstimatedTransactionFeeResponse,
   GetMasternodeStatusRequest,
   GetMasternodeStatusResponse,
   GetTransactionRequest,
@@ -18,14 +17,15 @@ import {
   TransactionsWithProofsRequest, type TransactionsWithProofsResponse
 } from '../proto/generated/core.js'
 import bloomFilter from 'bloom-filter'
-import { BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, Network } from './constants.js'
+import {
+  BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, Network
+} from './constants.js'
 import { addressToPublicKeyHash, bytesToHex, hexToBytes, wait } from './utils.js'
 import { p2pkh } from '@scure/btc-signer'
 import * as secp from '@noble/secp256k1'
 import { PrivateKey } from './types/PrivateKey.js'
 import { Transaction } from './types/Transaction.js'
 import { InstantLock } from './types/InstantLock.js'
-import { Output } from './types/Output.js'
 import type { ServerStreamingCall } from '@protobuf-ts/runtime-rpc'
 import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './types/ExtraPayload/AssetUnlockTx.js'
@@ -116,33 +116,13 @@ export class DashCoreSDK {
   constructor (options: { network?: 'mainnet' | 'testnet', dapiUrl?: string, poolLimit?: number } = {}) {
     this.network = options.network ?? 'testnet'
     this.grpcConnectionPool = new GRPCConnectionPool(this.network, {
-      dapiUrl: options.dapiUrl ?? (this.network === 'mainnet' ? 'http://127.0.0.1:443' : 'http://127.0.0.1:1443'),
+      dapiUrl: options.dapiUrl,
       poolLimit: options.poolLimit ?? 5
     })
   }
 
   private getNetworkType (): Network {
     return this.network === 'mainnet' ? Network.Mainnet : Network.Testnet
-  }
-
-  private getPaymentAmount (amount: number): bigint {
-    if (!Number.isSafeInteger(amount) || amount < 0) {
-      throw new Error('Amount must be a non-negative safe integer')
-    }
-
-    return BigInt(amount)
-  }
-
-  private getOutputAddress (output: Output): string | undefined {
-    return output.script.getAddress(this.getNetworkType())
-  }
-
-  private outputMatchesPayment (output: Output, address: string, amount: bigint): boolean {
-    return output.satoshis >= amount && this.getOutputAddress(output) === address
-  }
-
-  private transactionMatchesPayment (transaction: Transaction, address: string, amount: bigint): boolean {
-    return transaction.outputs.some(output => this.outputMatchesPayment(output, address, amount))
   }
 
   private async getVerifiedTransaction (txid: string): Promise<{ dapiTransaction: DapiTransaction, transaction: Transaction } | undefined> {
@@ -167,7 +147,12 @@ export class DashCoreSDK {
       return undefined
     }
 
-    if (!this.transactionMatchesPayment(transactionInfo.transaction, address, amount)) {
+    const transactionMatchesPayment = transactionInfo
+      .transaction
+      .outputs
+      .some(output => output.satoshis >= amount && output.script.getAddress(this.getNetworkType()) === address)
+
+    if (!transactionMatchesPayment) {
       return undefined
     }
 
@@ -240,10 +225,12 @@ export class DashCoreSDK {
     }))).response
   }
 
-  async getEstimatedTransactionFee (blocks: number): Promise<GetEstimatedTransactionFeeResponse> {
+  async getEstimatedTransactionFee (blocks: number): Promise<number> {
     const client = this.grpcConnectionPool.getClient()
 
-    return (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks }))).response
+    const { response } = (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks })))
+
+    return response.fee
   }
 
   subscribeToBlockHeadersWithChainLocks (count: number = 0, fromBlockHash?: Uint8Array, fromBlockHeight?: number): AsyncIterable<BlockHeadersWithChainLocksResponse> {
@@ -262,8 +249,7 @@ export class DashCoreSDK {
     // return stream
   }
 
-  async waitForPayment (address: string, amount: number = 1000): Promise<PaymentInfo> {
-    const paymentAmount = this.getPaymentAmount(amount)
+  async waitForPayment (address: string, amount: bigint = 1000n): Promise<PaymentInfo> {
     const pendingTransactions = new Map<string, Transaction>()
     const pendingInstantLocks = new Map<string, string>()
 
@@ -275,7 +261,7 @@ export class DashCoreSDK {
           await wait(5000)
 
           for (const txid of pendingTransactions.keys()) {
-            const paymentInfo = await this.getChainLockedPaymentInfo(txid, address, paymentAmount)
+            const paymentInfo = await this.getChainLockedPaymentInfo(txid, address, amount)
 
             if (paymentInfo != null) {
               return paymentInfo
@@ -286,7 +272,11 @@ export class DashCoreSDK {
         case 'rawTransaction': {
           const transaction = Transaction.fromBytes(hexToBytes(event.data))
 
-          if (!this.transactionMatchesPayment(transaction, address, paymentAmount)) {
+          const transactionMatchesPayment = transaction
+            .outputs
+            .some(output => output.satoshis >= amount && output.script.getAddress(this.getNetworkType()) === address)
+
+          if (!transactionMatchesPayment) {
             break
           }
 
@@ -326,12 +316,16 @@ export class DashCoreSDK {
     throw new Error('Unreachable code block in waitForPayment')
   }
 
-  async * subscribeToTransactions (addresses: string[]): AsyncIterable<SubscribeToTransactionsEvent> {
-    const numberOfElements = Math.max(addresses.length, 1)
+  async * subscribeToTransactions (addresses: string[], extraFilterData: Uint8Array[] = []): AsyncIterable<SubscribeToTransactionsEvent> {
+    const numberOfElements = Math.max(addresses.length + extraFilterData.length, 1)
     const bf = bloomFilter.create(numberOfElements, BLOOM_FILTER_FALSE_POSITIVE_RATE)
 
     for (const address of addresses) {
       bf.insert(addressToPublicKeyHash(address))
+    }
+
+    for (const data of extraFilterData) {
+      bf.insert(data)
     }
 
     // subscribe to new transactions
@@ -385,8 +379,10 @@ export class DashCoreSDK {
         }
       }
     } catch (e) {
-      if (e?.message === reconnectReason || abortController.signal.reason === reconnectReason) {
-        return yield * this.subscribeToTransactions(addresses)
+      const message = e instanceof Error ? e.message : undefined
+
+      if (message === reconnectReason || abortController.signal.reason === reconnectReason) {
+        return yield * this.subscribeToTransactions(addresses, extraFilterData)
       }
 
       throw e
@@ -402,7 +398,7 @@ export class DashCoreSDK {
       throw new Error('Either fromBlockHash or fromBlockHeight must be set')
     }
 
-    let fromBlock
+    let fromBlock: TransactionsWithProofsRequest['fromBlock'] = { oneofKind: undefined }
 
     if (fromBlockHash != null) {
       fromBlock = {

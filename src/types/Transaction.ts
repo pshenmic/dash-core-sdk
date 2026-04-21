@@ -118,11 +118,11 @@ export class Transaction {
   }
 
   #signInput (privateKey: PrivateKey, inputIndex: number): void {
-    if (this.inputs.length < inputIndex) {
-      throw new Error(`input with not found (index: ${inputIndex})`)
+    if (inputIndex >= this.inputs.length) {
+      throw new Error(`inputIndex(${inputIndex}) must be less than inputs count ${this.inputs.length}`)
     }
     if (inputIndex < 0) {
-      throw new Error('inputIndex must be greater than 0')
+      throw new Error(`inputIndex(${inputIndex}) must be greater than 0`)
     }
 
     const publicKey = privateKey.getPublicKey()

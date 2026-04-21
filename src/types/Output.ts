@@ -37,6 +37,14 @@ export class Output {
     return Output.fromBytes(hexToBytes(hex))
   }
 
+  static createP2PKH (satoshis: bigint, address: string): Output {
+    const output = new Output(satoshis)
+
+    output.generateP2PKH(address)
+
+    return output
+  }
+
   bytes (): Uint8Array {
     const scriptBytes = this.script.bytes()
     const scriptSize = encodeCompactSize(scriptBytes.byteLength)

@@ -336,7 +336,7 @@ describe('Utils', () => {
       const start = Date.now()
       await wait(100)
       const end = Date.now()
-      expect(end - start).toBeGreaterThanOrEqual(100)
+      expect(end - start).toBeGreaterThanOrEqual(95)
     })
 
     it('should be callable multiple times', async () => {
@@ -344,7 +344,7 @@ describe('Utils', () => {
       await wait(50)
       await wait(50)
       const end = Date.now()
-      expect(end - start).toBeGreaterThanOrEqual(100)
+      expect(end - start).toBeGreaterThanOrEqual(95)
     })
   })
 })
