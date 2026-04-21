@@ -1,7 +1,7 @@
-import {Transaction} from "./types/Transaction.js";
-import {InstantLock} from "./types/InstantLock.js";
-import {TransactionType} from "./constants.js";
-import {AssetLockTx} from "./types/ExtraPayload/AssetLockTx.js";
+import { Transaction } from './types/Transaction.js'
+import { InstantLock } from './types/InstantLock.js'
+import { TransactionType } from './constants.js'
+import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
 
 export interface InstantAssetLockProofParams {
   type: 'instantLock'
@@ -18,20 +18,18 @@ export interface ChainAssetLockProofParams {
 }
 
 export interface InstantAssetLockProofData {
-  transaction: Transaction,
-  instantLock: InstantLock,
+  transaction: Transaction
+  instantLock: InstantLock
   outputIndex: number
 }
 
 export interface ChainAssetLockProofData {
-  transaction: Transaction,
-  coreChainLockedHeight: number,
+  transaction: Transaction
+  coreChainLockedHeight: number
   outputIndex: number
 }
 
 export class UtilsController {
-  constructor() {}
-
   createAssetLockProof (data: InstantAssetLockProofData | ChainAssetLockProofData): InstantAssetLockProofParams | ChainAssetLockProofParams {
     const txid = data.transaction.hash()
 
@@ -43,7 +41,7 @@ export class UtilsController {
       throw new Error(`outputIndex must be lower than the number of asset lock credit outputs (${data.transaction.extraPayload.outputs.length})`)
     }
 
-    if("instantLock" in data && !("coreChainLockedHeight" in data)) {
+    if ('instantLock' in data && !('coreChainLockedHeight' in data)) {
       // instant lock
       if (data.instantLock.txId !== txid) {
         throw new Error(`InstantLock txid ${data.instantLock.txId} does not match transaction txid ${txid}`)
@@ -53,9 +51,9 @@ export class UtilsController {
         type: 'instantLock',
         instantLock: data.instantLock.hex(),
         transaction: data.transaction.hex(),
-        outputIndex: data.outputIndex,
+        outputIndex: data.outputIndex
       }
-    } else if("coreChainLockedHeight" in data && !("instantLock" in data)) {
+    } else if ('coreChainLockedHeight' in data && !('instantLock' in data)) {
       // chain lock
       if (data.coreChainLockedHeight < 0) {
         throw new Error('coreChainLockedHeight must be a non-negative integer')
@@ -68,7 +66,7 @@ export class UtilsController {
         coreChainLockedHeight: data.coreChainLockedHeight
       }
     } else {
-      throw new Error("Invalid lock params");
+      throw new Error('Invalid lock params')
     }
   }
 }

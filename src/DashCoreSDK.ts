@@ -18,7 +18,7 @@ import {
 } from '../proto/generated/core.js'
 import bloomFilter from 'bloom-filter'
 import {
-  BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, Network,
+  BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, Network
 } from './constants.js'
 import { addressToPublicKeyHash, bytesToHex, hexToBytes, wait } from './utils.js'
 import { p2pkh } from '@scure/btc-signer'
@@ -38,7 +38,7 @@ import { ProUpServTx } from './types/ExtraPayload/ProUpServTx.js'
 import { QcTx } from './types/ExtraPayload/QcTx.js'
 import { MnHfSignal } from './types/Messages/MnHfSignal.js'
 import { QfCommit } from './types/Messages/QfCommit.js'
-import {UtilsController} from "./utilsController.js";
+import { UtilsController } from './utilsController.js'
 
 interface DapiTransaction {
   transaction: Uint8Array
@@ -231,7 +231,7 @@ export class DashCoreSDK {
   async getEstimatedTransactionFee (blocks: number): Promise<number> {
     const client = this.grpcConnectionPool.getClient()
 
-    const {response} = (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks })))
+    const { response } = (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks })))
 
     return response.fee
   }
