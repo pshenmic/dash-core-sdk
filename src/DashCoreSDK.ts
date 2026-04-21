@@ -38,7 +38,6 @@ import { ProUpServTx } from './types/ExtraPayload/ProUpServTx.js'
 import { QcTx } from './types/ExtraPayload/QcTx.js'
 import { MnHfSignal } from './types/Messages/MnHfSignal.js'
 import { QfCommit } from './types/Messages/QfCommit.js'
-import { UtilsController } from './utilsController.js'
 
 interface DapiTransaction {
   transaction: Uint8Array
@@ -113,7 +112,6 @@ export { extraPayload as ExtraPayload }
 export class DashCoreSDK {
   grpcConnectionPool: GRPCConnectionPool
   network: 'mainnet' | 'testnet'
-  utils: UtilsController
 
   constructor (options: { network?: 'mainnet' | 'testnet', dapiUrl?: string, poolLimit?: number } = {}) {
     this.network = options.network ?? 'testnet'
@@ -121,7 +119,6 @@ export class DashCoreSDK {
       dapiUrl: options.dapiUrl,
       poolLimit: options.poolLimit ?? 5
     })
-    this.utils = new UtilsController()
   }
 
   private getNetworkType (): Network {

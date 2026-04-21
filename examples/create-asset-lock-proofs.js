@@ -1,7 +1,7 @@
 import { DashCoreSDK } from '../dist/index.js'
-import {createAssetLockProof} from "../src/utils.ts";
-import {InstantLock} from "../src/DashCoreSDK.ts";
-import {Transaction} from "@scure/btc-signer";
+import { createAssetLockProof } from '../src/utils.ts'
+import { InstantLock } from '../src/DashCoreSDK.ts'
+import { Transaction } from '@scure/btc-signer'
 
 const NETWORK = 'testnet'
 const DAPI_URL = 'https://158.160.14.115:1443'

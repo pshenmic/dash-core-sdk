@@ -1,11 +1,11 @@
-import {DEFAULT_NETWORK, Network, PubKeyHashAddressNetworkPrefix, TransactionType} from './constants.js'
+import { DEFAULT_NETWORK, Network, PubKeyHashAddressNetworkPrefix, TransactionType } from './constants.js'
 import { ripemd160 } from '@noble/hashes/legacy.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { Base58Check } from './base58check.js'
 import { NetworkLike } from './types.js'
-import {AssetLockTx} from "./types/ExtraPayload/AssetLockTx.js";
-import {Transaction} from "./types/Transaction.js";
-import {InstantLock} from "./types/InstantLock.js";
+import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
+import { Transaction } from './types/Transaction.js'
+import { InstantLock } from './types/InstantLock.js'
 
 export interface InstantAssetLockProofParams {
   type: 'instantLock'
