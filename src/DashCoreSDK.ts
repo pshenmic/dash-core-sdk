@@ -252,7 +252,7 @@ export class DashCoreSDK {
     // return stream
   }
 
-  async waitForIncomingTransaction (address: string, amount: bigint = 1000n): Promise<PaymentInfo> {
+  async waitForPayment (address: string, amount: bigint = 1000n): Promise<PaymentInfo> {
     const pendingTransactions = new Map<string, Transaction>()
     const pendingInstantLocks = new Map<string, string>()
 
@@ -316,7 +316,7 @@ export class DashCoreSDK {
       }
     }
 
-    throw new Error('Unreachable code block in waitForIncomingTransaction')
+    throw new Error('Unreachable code block in waitForPayment')
   }
 
   async * subscribeToTransactions (addresses: string[], extraFilterData: Uint8Array[] = []): AsyncIterable<SubscribeToTransactionsEvent> {

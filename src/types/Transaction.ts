@@ -31,12 +31,6 @@ import { MnHfTx } from './ExtraPayload/MnHfTx.js'
 import { AssetLockTx } from './ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './ExtraPayload/AssetUnlockTx.js'
 
-export interface TransactionInputToSign {
-  inputIndex: number
-  privateKey: PrivateKey
-  lockingScript: Script
-}
-
 export class Transaction {
   version: number
   type: TransactionType

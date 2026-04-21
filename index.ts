@@ -16,8 +16,6 @@ import { Transaction } from './src/types/Transaction.js'
 import { Network, TransactionType } from './src/constants.js'
 import * as utils from './src/utils.js'
 
-export type { TransactionInputToSign } from './src/types/Transaction.js'
-
 export {
   DashCoreSDK,
   BlockHeader,
