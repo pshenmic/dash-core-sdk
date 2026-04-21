@@ -19,7 +19,6 @@ import {
 import bloomFilter from 'bloom-filter'
 import {
   BLOOM_FILTER_FALSE_POSITIVE_RATE, DAPI_STREAM_RECONNECT_TIMEOUT, DASH_VERSIONS, Network,
-  TransactionType
 } from './constants.js'
 import { addressToPublicKeyHash, bytesToHex, hexToBytes, wait } from './utils.js'
 import { p2pkh } from '@scure/btc-signer'
@@ -39,6 +38,7 @@ import { ProUpServTx } from './types/ExtraPayload/ProUpServTx.js'
 import { QcTx } from './types/ExtraPayload/QcTx.js'
 import { MnHfSignal } from './types/Messages/MnHfSignal.js'
 import { QfCommit } from './types/Messages/QfCommit.js'
+import {UtilsController} from "./utilsController.js";
 
 interface DapiTransaction {
   transaction: Uint8Array
@@ -77,20 +77,6 @@ export interface CoreKeyPair {
   wif: string
 }
 
-export interface InstantAssetLockProofParams {
-  type: 'instantLock'
-  transaction: string
-  outputIndex: number
-  instantLock: string
-}
-
-export interface ChainAssetLockProofParams {
-  type: 'chainLock'
-  txid: string
-  outputIndex: number
-  coreChainLockedHeight: number
-}
-
 export { BlockHeader } from './types/BlockHeader.js'
 export { BloomFilterWriter } from './types/BloomFilter.js'
 export { Input } from './types/Input.js'
@@ -127,6 +113,7 @@ export { extraPayload as ExtraPayload }
 export class DashCoreSDK {
   grpcConnectionPool: GRPCConnectionPool
   network: 'mainnet' | 'testnet'
+  utils: UtilsController
 
   constructor (options: { network?: 'mainnet' | 'testnet', dapiUrl?: string, poolLimit?: number } = {}) {
     this.network = options.network ?? 'testnet'
@@ -134,6 +121,7 @@ export class DashCoreSDK {
       dapiUrl: options.dapiUrl,
       poolLimit: options.poolLimit ?? 5
     })
+    this.utils = new UtilsController()
   }
 
   private getNetworkType (): Network {
@@ -246,50 +234,6 @@ export class DashCoreSDK {
     const {response} = (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks })))
 
     return response.fee
-  }
-
-  createInstantAssetLockProof (transaction: Transaction, instantLock: InstantLock, outputIndex: number = 0): InstantAssetLockProofParams {
-    if (transaction.type !== TransactionType.TRANSACTION_ASSET_LOCK || !(transaction.extraPayload instanceof AssetLockTx)) {
-      throw new Error('Asset lock proof requires an asset lock transaction')
-    }
-
-    if (outputIndex >= transaction.extraPayload.outputs.length) {
-      throw new Error(`outputIndex must be lower than the number of asset lock credit outputs (${transaction.extraPayload.outputs.length})`)
-    }
-
-    const txid = transaction.hash()
-
-    if (instantLock.txId !== txid) {
-      throw new Error(`InstantLock txid ${instantLock.txId} does not match transaction txid ${txid}`)
-    }
-
-    return {
-      type: 'instantLock',
-      instantLock: instantLock.hex(),
-      transaction: transaction.hex(),
-      outputIndex
-    }
-  }
-
-  createChainAssetLockProof (transaction: Transaction, coreChainLockedHeight: number, outputIndex: number = 0): ChainAssetLockProofParams {
-    if (!Number.isSafeInteger(coreChainLockedHeight) || coreChainLockedHeight < 0) {
-      throw new Error('coreChainLockedHeight must be a non-negative safe integer')
-    }
-
-    if (transaction.type !== TransactionType.TRANSACTION_ASSET_LOCK || !(transaction.extraPayload instanceof AssetLockTx)) {
-      throw new Error('Asset lock proof requires an asset lock transaction')
-    }
-
-    if (outputIndex >= transaction.extraPayload.outputs.length) {
-      throw new Error(`outputIndex must be lower than the number of asset lock credit outputs (${transaction.extraPayload.outputs.length})`)
-    }
-
-    return {
-      type: 'chainLock',
-      txid: transaction.hash(),
-      outputIndex,
-      coreChainLockedHeight
-    }
   }
 
   subscribeToBlockHeadersWithChainLocks (count: number = 0, fromBlockHash?: Uint8Array, fromBlockHeight?: number): AsyncIterable<BlockHeadersWithChainLocksResponse> {
