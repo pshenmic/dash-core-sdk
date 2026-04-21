@@ -124,7 +124,7 @@ export class Transaction {
   }
 
   #signInput (privateKey: PrivateKey, inputIndex: number): void {
-    if (this.inputs.length <= inputIndex) {
+    if (inputIndex >= this.inputs.length) {
       throw new Error(`input with not found (index: ${inputIndex})`)
     }
     if (inputIndex < 0) {
