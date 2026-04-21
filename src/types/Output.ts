@@ -45,15 +45,6 @@ export class Output {
     return output
   }
 
-  static createAssetLock (satoshis: bigint): Output {
-    const script = new Script()
-
-    script.pushOpCode('OP_RETURN')
-    script.pushOpCode('OP_0')
-
-    return new Output(satoshis, script)
-  }
-
   bytes (): Uint8Array {
     const scriptBytes = this.script.bytes()
     const scriptSize = encodeCompactSize(scriptBytes.byteLength)
