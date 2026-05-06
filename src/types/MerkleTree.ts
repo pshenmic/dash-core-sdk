@@ -124,7 +124,7 @@ export class MerkleTree {
   }
 
   static fromBytes (bytes: Uint8Array): MerkleTree {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const transactionCount = dataView.getUint32(0, true)
     const hashCount = decodeCompactSize(4, bytes)

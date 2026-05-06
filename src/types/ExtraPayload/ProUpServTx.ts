@@ -57,7 +57,7 @@ export class ProUpServTx {
   }
 
   static fromBytes (bytes: Uint8Array): ProUpServTx {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint16(0, true)
     const type = dataView.getUint16(2, true)
@@ -108,8 +108,8 @@ export class ProUpServTx {
     const versionBytes = new Uint8Array(2)
     const typeBytes = new Uint8Array(2)
 
-    new DataView(versionBytes.buffer).setUint16(0, this.version, true)
-    new DataView(typeBytes.buffer).setUint16(0, this.type, true)
+    new DataView(versionBytes.buffer, versionBytes.byteOffset, versionBytes.byteLength).setUint16(0, this.version, true)
+    new DataView(typeBytes.buffer, typeBytes.byteOffset, typeBytes.byteLength).setUint16(0, this.type, true)
 
     const proTxHashBytes = new Uint8Array(hexToBytes(this.proTxHash).toReversed())
 
@@ -117,7 +117,7 @@ export class ProUpServTx {
 
     const portBytes = new Uint8Array(2)
 
-    new DataView(portBytes.buffer).setUint16(0, this.port, false)
+    new DataView(portBytes.buffer, portBytes.byteOffset, portBytes.byteLength).setUint16(0, this.port, false)
 
     const scriptOperatorPayoutBytes = this.scriptOperatorPayout.bytes()
     const scriptOperatorPayoutSizeBytes = encodeCompactSize(scriptOperatorPayoutBytes.byteLength)
@@ -133,8 +133,8 @@ export class ProUpServTx {
       platformP2PPortBytes = new Uint8Array(2)
       platformHTTPPortBytes = new Uint8Array(2)
 
-      new DataView(platformP2PPortBytes.buffer).setUint16(0, this.platformP2PPort ?? 0, true)
-      new DataView(platformHTTPPortBytes.buffer).setUint16(0, this.platformHTTPPort ?? 0, true)
+      new DataView(platformP2PPortBytes.buffer, platformP2PPortBytes.byteOffset, platformP2PPortBytes.byteLength).setUint16(0, this.platformP2PPort ?? 0, true)
+      new DataView(platformHTTPPortBytes.buffer, platformHTTPPortBytes.byteOffset, platformHTTPPortBytes.byteLength).setUint16(0, this.platformHTTPPort ?? 0, true)
     }
 
     const payloadSigBytes = hexToBytes(this.payloadSig)

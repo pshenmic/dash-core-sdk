@@ -14,7 +14,7 @@ export class AssetLockTx {
   }
 
   static fromBytes (bytes: Uint8Array): AssetLockTx {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint8(0)
     const count = dataView.getUint8(1)
@@ -40,8 +40,8 @@ export class AssetLockTx {
     const versionByte = new Uint8Array(1)
     const countByte = new Uint8Array(1)
 
-    new DataView(versionByte.buffer).setUint8(0, this.version)
-    new DataView(countByte.buffer).setUint8(0, this.count)
+    new DataView(versionByte.buffer, versionByte.byteOffset, versionByte.byteLength).setUint8(0, this.version)
+    new DataView(countByte.buffer, countByte.byteOffset, countByte.byteLength).setUint8(0, this.count)
 
     const outputsBytes = this.outputs.reduce((acc, curr) => {
       const outputBytes = curr.bytes()

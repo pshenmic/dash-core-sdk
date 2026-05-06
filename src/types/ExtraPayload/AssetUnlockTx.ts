@@ -19,7 +19,7 @@ export class AssetUnlockTx {
   }
 
   static fromBytes (bytes: Uint8Array): AssetUnlockTx {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint8(0)
     const index = dataView.getBigUint64(1, true)
@@ -42,10 +42,10 @@ export class AssetUnlockTx {
     const feeBytes = new Uint8Array(4)
     const requestedHeightBytes = new Uint8Array(4)
 
-    new DataView(versionByte.buffer).setUint8(0, this.version)
-    new DataView(indexBytes.buffer).setBigUint64(0, this.index, true)
-    new DataView(feeBytes.buffer).setUint32(0, this.fee, true)
-    new DataView(requestedHeightBytes.buffer).setUint32(0, this.requestedHeight, true)
+    new DataView(versionByte.buffer, versionByte.byteOffset, versionByte.byteLength).setUint8(0, this.version)
+    new DataView(indexBytes.buffer, indexBytes.byteOffset, indexBytes.byteLength).setBigUint64(0, this.index, true)
+    new DataView(feeBytes.buffer, feeBytes.byteOffset, feeBytes.byteLength).setUint32(0, this.fee, true)
+    new DataView(requestedHeightBytes.buffer, requestedHeightBytes.byteOffset, requestedHeightBytes.byteLength).setUint32(0, this.requestedHeight, true)
 
     const quorumHashBytes = hexToBytes(this.quorumHash).toReversed()
     const quorumSigBytes = hexToBytes(this.quorumSig)

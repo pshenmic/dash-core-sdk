@@ -78,7 +78,7 @@ export class ProRegTX {
   }
 
   static fromBytes (bytes: Uint8Array): ProRegTX {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint16(0, true)
     const type = dataView.getUint16(2, true)
@@ -139,9 +139,9 @@ export class ProRegTX {
     const typeBytes = new Uint8Array(2)
     const modeBytes = new Uint8Array(2)
 
-    new DataView(versionBytes.buffer).setUint16(0, this.version, true)
-    new DataView(typeBytes.buffer).setUint16(0, this.type, true)
-    new DataView(modeBytes.buffer).setUint16(0, this.mode, true)
+    new DataView(versionBytes.buffer, versionBytes.byteOffset, versionBytes.byteLength).setUint16(0, this.version, true)
+    new DataView(typeBytes.buffer, typeBytes.byteOffset, typeBytes.byteLength).setUint16(0, this.type, true)
+    new DataView(modeBytes.buffer, modeBytes.byteOffset, modeBytes.byteLength).setUint16(0, this.mode, true)
 
     const collateralOutpointBytes = this.collateralOutpoint.bytes()
 
@@ -149,7 +149,7 @@ export class ProRegTX {
 
     const portBytes = new Uint8Array(2)
 
-    new DataView(portBytes.buffer).setUint16(0, this.port, false)
+    new DataView(portBytes.buffer, portBytes.byteOffset, portBytes.byteLength).setUint16(0, this.port, false)
 
     const keyIdBytes = hexToBytes(this.keyIdOwner)
     const pubKeyOperatorBytes = hexToBytes(this.pubKeyOperator)
@@ -157,7 +157,7 @@ export class ProRegTX {
 
     const operatorRewardBytes = new Uint8Array(2)
 
-    new DataView(operatorRewardBytes.buffer).setUint16(0, this.operatorReward, true)
+    new DataView(operatorRewardBytes.buffer, operatorRewardBytes.byteOffset, operatorRewardBytes.byteLength).setUint16(0, this.operatorReward, true)
 
     const scriptPayoutBytes = this.scriptPayout.bytes()
     const scriptPayoutSizeBytes = encodeCompactSize(scriptPayoutBytes.byteLength)
@@ -173,8 +173,8 @@ export class ProRegTX {
       platformP2PPortBytes = new Uint8Array(2)
       platformHTTPPortBytes = new Uint8Array(2)
 
-      new DataView(platformP2PPortBytes.buffer).setUint16(0, this.platformP2PPort ?? 0, true)
-      new DataView(platformHTTPPortBytes.buffer).setUint16(0, this.platformHTTPPort ?? 0, true)
+      new DataView(platformP2PPortBytes.buffer, platformP2PPortBytes.byteOffset, platformP2PPortBytes.byteLength).setUint16(0, this.platformP2PPort ?? 0, true)
+      new DataView(platformHTTPPortBytes.buffer, platformHTTPPortBytes.byteOffset, platformHTTPPortBytes.byteLength).setUint16(0, this.platformHTTPPort ?? 0, true)
     }
 
     const payloadSigBytes = hexToBytes(this.payloadSig)

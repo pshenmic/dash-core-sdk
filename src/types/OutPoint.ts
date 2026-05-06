@@ -28,7 +28,7 @@ export class OutPoint {
   }
 
   static fromBytes (bytes: Uint8Array): OutPoint {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const txId = bytes.slice(0, 32)
     const vOut = dataView.getUint32(32, true)

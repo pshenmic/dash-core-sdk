@@ -8,18 +8,22 @@ export class QfCommit {
   quorumIndex?: number
   signers: string
   validMembers: string
+  signersBitsSize: number | bigint
+  validMembersBitsSize: number | bigint
   quorumPublicKey: string
   quorumVvecHash: string
   quorumSig: string
   sig: string
 
-  constructor (version: number, llmqType: number, quorumHash: string, signers: string, validMembers: string, quorumPublicKey: string, quorumVvecHash: string, quorumSig: string, sig: string, quorumIndex?: number) {
+  constructor (version: number, llmqType: number, quorumHash: string, signers: string, validMembers: string, quorumPublicKey: string, quorumVvecHash: string, quorumSig: string, sig: string, signersBitsSize: number | bigint, validMembersBitsSize: number | bigint, quorumIndex?: number) {
     this.version = version
     this.llmqType = llmqType
     this.quorumHash = quorumHash
     this.quorumIndex = quorumIndex
     this.signers = signers
     this.validMembers = validMembers
+    this.signersBitsSize = signersBitsSize
+    this.validMembersBitsSize = validMembersBitsSize
     this.quorumPublicKey = quorumPublicKey
     this.quorumVvecHash = quorumVvecHash
     this.quorumSig = quorumSig
@@ -27,7 +31,7 @@ export class QfCommit {
   }
 
   static fromBytes (bytes: Uint8Array): QfCommit {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint16(0, true)
     const llmqType = dataView.getUint8(2)
@@ -37,21 +41,22 @@ export class QfCommit {
     let signersOffset = 35
     let quorumIndex
 
-    if (version >= 2) {
+    // Per Dash Core (llmq/commitment.h), only versions 2 and 4 are indexed.
+    if (version === 2 || version === 4) {
       quorumIndex = dataView.getUint16(35, true)
       signersOffset += 2
     }
 
     const signersBitsSize = decodeCompactSize(signersOffset, bytes)
     // https://docs.dash.org/en/stable/docs/core/reference/p2p-network-quorum-messages.html#qfcommit
-    const signersSize = (Number(signersBitsSize) + 7) / 8
+    const signersSize = Math.ceil(Number(signersBitsSize) / 8)
     const signers = bytes.slice(signersOffset + getCompactVariableSize(signersBitsSize), signersOffset + getCompactVariableSize(signersBitsSize) + signersSize)
 
     const validMembersOffset = signersOffset + getCompactVariableSize(signersBitsSize) + signersSize
 
     const validMembersBitsSize = decodeCompactSize(validMembersOffset, bytes)
     // https://docs.dash.org/en/stable/docs/core/reference/p2p-network-quorum-messages.html#qfcommit
-    const validMembersSize = (Number(validMembersBitsSize) + 7) / 8
+    const validMembersSize = Math.ceil(Number(validMembersBitsSize) / 8)
     const validMembers = bytes.slice(validMembersOffset + getCompactVariableSize(validMembersBitsSize), validMembersOffset + getCompactVariableSize(validMembersBitsSize) + validMembersSize)
 
     const quorumPublicKeyOffset = validMembersOffset + getCompactVariableSize(validMembersBitsSize) + validMembersSize
@@ -61,7 +66,7 @@ export class QfCommit {
     const quorumSig = bytes.slice(quorumPublicKeyOffset + 48 + 32, quorumPublicKeyOffset + 48 + 32 + 96)
     const sig = bytes.slice(quorumPublicKeyOffset + 48 + 32 + 96, quorumPublicKeyOffset + 48 + 32 + 96 + 96)
 
-    return new QfCommit(version, llmqType, bytesToHex(quorumHash.toReversed()), bytesToHex(signers), bytesToHex(validMembers), bytesToHex(quorumPublicKey), bytesToHex(quorumVvecHash.toReversed()), bytesToHex(quorumSig), bytesToHex(sig), quorumIndex)
+    return new QfCommit(version, llmqType, bytesToHex(quorumHash.toReversed()), bytesToHex(signers), bytesToHex(validMembers), bytesToHex(quorumPublicKey), bytesToHex(quorumVvecHash.toReversed()), bytesToHex(quorumSig), bytesToHex(sig), signersBitsSize, validMembersBitsSize, quorumIndex)
   }
 
   static fromHex (hex: string): QfCommit {
@@ -72,22 +77,23 @@ export class QfCommit {
     const versionBytes = new Uint8Array(2)
     const llmqTypeBytes = new Uint8Array(1)
 
-    new DataView(versionBytes.buffer).setUint16(0, this.version, true)
-    new DataView(llmqTypeBytes.buffer).setUint8(0, this.llmqType)
+    new DataView(versionBytes.buffer, versionBytes.byteOffset, versionBytes.byteLength).setUint16(0, this.version, true)
+    new DataView(llmqTypeBytes.buffer, llmqTypeBytes.byteOffset, llmqTypeBytes.byteLength).setUint8(0, this.llmqType)
 
     const quorumHashBytes = hexToBytes(this.quorumHash).toReversed()
 
     let quorumIndexBytes = new Uint8Array(0)
 
-    if (this.version >= 2) {
+    // Per Dash Core (llmq/commitment.h), only versions 2 and 4 are indexed.
+    if (this.version === 2 || this.version === 4) {
       quorumIndexBytes = new Uint8Array(2)
-      new DataView(quorumIndexBytes.buffer).setUint16(0, this.quorumIndex ?? 0, true)
+      new DataView(quorumIndexBytes.buffer, quorumIndexBytes.byteOffset, quorumIndexBytes.byteLength).setUint16(0, this.quorumIndex ?? 0, true)
     }
 
     const signersBytes = hexToBytes(this.signers)
-    const signersBitsSizeBytes = encodeCompactSize(signersBytes.byteLength * 8 - 7)
+    const signersBitsSizeBytes = encodeCompactSize(this.signersBitsSize)
     const validMembersBytes = hexToBytes(this.validMembers)
-    const validMembersBitsSizeBytes = encodeCompactSize(validMembersBytes.byteLength * 8 - 7)
+    const validMembersBitsSizeBytes = encodeCompactSize(this.validMembersBitsSize)
 
     const quorumPublicKeyBytes = hexToBytes(this.quorumPublicKey)
     const quorumVvecHashBytes = hexToBytes(this.quorumVvecHash).toReversed()
