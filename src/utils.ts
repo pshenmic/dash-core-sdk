@@ -46,7 +46,7 @@ export function bytesToHex (bytes: Uint8Array): string {
 }
 
 export function decodeCompactSize (offset: number, bytes: Uint8Array): number | bigint {
-  const dataView = new DataView(bytes.buffer)
+  const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
   const prefix = dataView.getUint8(offset)
 
@@ -169,7 +169,7 @@ export function bytesToIp (bytes: Uint8Array): string {
     } else {
       const parts: string[] = []
 
-      const view = new DataView(bytes.buffer)
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
       for (let i = 0; i < bytes.length; i += 2) {
         parts.push(view.getUint16(i, false).toString(16))
       }
@@ -218,7 +218,7 @@ export function ipToBytes (ip: string, compact?: boolean): Uint8Array {
     if (parts.length !== 8) throw new Error('Invalid IPv6 address')
 
     const bytes = new Uint8Array(16)
-    const view = new DataView(bytes.buffer)
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     for (let i = 0; i < parts.length; i += 1) {
       const val = Number(`0x${parts[i]}`)

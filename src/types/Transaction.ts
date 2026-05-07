@@ -309,7 +309,7 @@ export class Transaction {
     // outputs
     // nLockTime
 
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const versionWithType = dataView.getInt32(0, true)
     const version = versionWithType & 0xffff
@@ -353,7 +353,7 @@ export class Transaction {
 
     let extraPayload: ExtraPayload | undefined
 
-    if (lockTimePadding + 4 < bytes.length) {
+    if (type !== 0 && lockTimePadding + 4 < bytes.length) {
       const extraPayloadSize = decodeCompactSize(lockTimePadding + 4, bytes)
 
       let extraPayloadHandler: Function

@@ -107,7 +107,7 @@ export class Script {
 
     const chunks: ScriptChunk[] = []
 
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     for (let i = 0; i < bytes.length; i++) {
       const opcode = dataView.getUint8(i)

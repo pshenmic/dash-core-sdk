@@ -13,7 +13,7 @@ export class MnHfSignal {
   }
 
   static fromBytes (bytes: Uint8Array): MnHfSignal {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint8(0)
     const quorumHash = bytes.slice(1, 33)
@@ -30,7 +30,7 @@ export class MnHfSignal {
     const out = new Uint8Array(129)
 
     const versionByte = new Uint8Array(1)
-    new DataView(versionByte.buffer).setUint8(0, this.versionBit)
+    new DataView(versionByte.buffer, versionByte.byteOffset, versionByte.byteLength).setUint8(0, this.versionBit)
 
     out.set(versionByte, 0)
     out.set(hexToBytes(this.quorumHash).toReversed(), 1)

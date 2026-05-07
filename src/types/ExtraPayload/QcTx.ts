@@ -14,7 +14,7 @@ export class QcTx {
   }
 
   static fromBytes (bytes: Uint8Array): QcTx {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint16(0, true)
     const height = dataView.getUint32(2, true)
@@ -32,8 +32,8 @@ export class QcTx {
     const versionBytes = new Uint8Array(2)
     const heightBytes = new Uint8Array(4)
 
-    new DataView(versionBytes.buffer).setUint16(0, this.version, true)
-    new DataView(heightBytes.buffer).setUint32(0, this.height, true)
+    new DataView(versionBytes.buffer, versionBytes.byteOffset, versionBytes.byteLength).setUint16(0, this.version, true)
+    new DataView(heightBytes.buffer, heightBytes.byteOffset, heightBytes.byteLength).setUint32(0, this.height, true)
 
     const commitmentBytes = this.commitment.bytes()
 
