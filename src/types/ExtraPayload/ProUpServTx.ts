@@ -32,7 +32,7 @@ export class ProUpServTx {
 
   payloadSig: string
 
-  constructor (version: number, type: number, proTxHash: string, ipAddress: string, port: number, /* netInfo: Uint8Array, */ scriptOperatorPayout: Script, inputsHash: string, platformNodeID: string, platformP2PPort: number, platformHTTPPort: number, payloadSig: string) {
+  constructor (version: number, type: number, proTxHash: string, ipAddress: string, port: number, /* netInfo: Uint8Array, */ scriptOperatorPayout: Script, inputsHash: string, platformNodeID: string | undefined, platformP2PPort: number | undefined, platformHTTPPort: number | undefined, payloadSig: string) {
     this.version = version
     this.type = type
 
@@ -60,44 +60,66 @@ export class ProUpServTx {
     const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint16(0, true)
-    const type = dataView.getUint16(2, true)
 
-    const proTxHash = bytes.slice(4, 36)
-
-    let ipAddress: Uint8Array
-    let port: number
-
-    if (version < 3) {
-      ipAddress = bytes.slice(36, 52)
-
-      port = dataView.getUint16(52, false)
-    } else {
+    if (version >= 3) {
       throw new Error(`Unsupported version of ProUpServTX: ${version}`)
     }
 
-    const scriptPayoutSize = decodeCompactSize(54, bytes)
-    const scriptOperatorPayout = Script.fromBytes(bytes.slice(54 + getCompactVariableSize(scriptPayoutSize), 54 + getCompactVariableSize(scriptPayoutSize) + Number(scriptPayoutSize)))
+    let cursor = 2
 
-    const inputsHashOffset = 54 + getCompactVariableSize(scriptPayoutSize) + Number(scriptPayoutSize)
-    const inputsHash = bytes.slice(inputsHashOffset, inputsHashOffset + 32)
-
-    let platformNodeID
-    let platformP2PPort
-    let platformHTTPPort
-
-    let payloadSigOffset = inputsHashOffset + 32
-
-    if (version === 2) {
-      platformNodeID = bytes.slice(inputsHashOffset + 32, inputsHashOffset + 32 + 20)
-      platformP2PPort = dataView.getUint16(inputsHashOffset + 32 + 20, true)
-      platformHTTPPort = dataView.getUint16(inputsHashOffset + 32 + 22, true)
-
-      payloadSigOffset += 24
+    // Per Dash Core CProUpServTx: nType is only serialized when nVersion >= 2.
+    let type = 0
+    if (version >= 2) {
+      type = dataView.getUint16(cursor, true)
+      cursor += 2
     }
 
-    const payloadSig = bytes.slice(payloadSigOffset, payloadSigOffset + 96)
+    const proTxHash = bytes.slice(cursor, cursor + 32)
+    cursor += 32
 
-    return new ProUpServTx(version, type, bytesToHex(proTxHash.toReversed()), bytesToIp(ipAddress), port, scriptOperatorPayout, bytesToHex(inputsHash.toReversed()), bytesToHex(platformNodeID.toReversed()), platformP2PPort, platformHTTPPort, bytesToHex(payloadSig))
+    const ipAddress = bytes.slice(cursor, cursor + 16)
+    cursor += 16
+
+    const port = dataView.getUint16(cursor, false)
+    cursor += 2
+
+    const scriptPayoutSize = decodeCompactSize(cursor, bytes)
+    cursor += getCompactVariableSize(scriptPayoutSize)
+    const scriptOperatorPayout = Script.fromBytes(bytes.slice(cursor, cursor + Number(scriptPayoutSize)))
+    cursor += Number(scriptPayoutSize)
+
+    const inputsHash = bytes.slice(cursor, cursor + 32)
+    cursor += 32
+
+    let platformNodeID: Uint8Array | undefined
+    let platformP2PPort: number | undefined
+    let platformHTTPPort: number | undefined
+
+    // Per Dash Core, platform fields exist iff nType == MnType::Evo (1).
+    if (type === 1) {
+      platformNodeID = bytes.slice(cursor, cursor + 20)
+      cursor += 20
+      platformP2PPort = dataView.getUint16(cursor, true)
+      cursor += 2
+      platformHTTPPort = dataView.getUint16(cursor, true)
+      cursor += 2
+    }
+
+    const payloadSig = bytes.slice(cursor, cursor + 96)
+
+    return new ProUpServTx(
+      version,
+      type,
+      bytesToHex(proTxHash.toReversed()),
+      bytesToIp(ipAddress),
+      port,
+      scriptOperatorPayout,
+      bytesToHex(inputsHash.toReversed()),
+      platformNodeID !== undefined ? bytesToHex(platformNodeID.toReversed()) : undefined,
+      platformP2PPort,
+      platformHTTPPort,
+      bytesToHex(payloadSig)
+    )
   }
 
   static fromHex (hex: string): ProUpServTx {
@@ -106,17 +128,20 @@ export class ProUpServTx {
 
   bytes (): Uint8Array {
     const versionBytes = new Uint8Array(2)
-    const typeBytes = new Uint8Array(2)
-
     new DataView(versionBytes.buffer, versionBytes.byteOffset, versionBytes.byteLength).setUint16(0, this.version, true)
-    new DataView(typeBytes.buffer, typeBytes.byteOffset, typeBytes.byteLength).setUint16(0, this.type, true)
+
+    // Per Dash Core CProUpServTx: nType is only serialized when nVersion >= 2.
+    let typeBytes = new Uint8Array(0)
+    if (this.version >= 2) {
+      typeBytes = new Uint8Array(2)
+      new DataView(typeBytes.buffer, typeBytes.byteOffset, typeBytes.byteLength).setUint16(0, this.type, true)
+    }
 
     const proTxHashBytes = new Uint8Array(hexToBytes(this.proTxHash).toReversed())
 
     const ipAddressBytes = ipToBytes(this.ipAddress)
 
     const portBytes = new Uint8Array(2)
-
     new DataView(portBytes.buffer, portBytes.byteOffset, portBytes.byteLength).setUint16(0, this.port, false)
 
     const scriptOperatorPayoutBytes = this.scriptOperatorPayout.bytes()
@@ -128,7 +153,8 @@ export class ProUpServTx {
     let platformP2PPortBytes: Uint8Array<ArrayBufferLike> = new Uint8Array(0)
     let platformHTTPPortBytes: Uint8Array<ArrayBufferLike> = new Uint8Array(0)
 
-    if (this.version === 2) {
+    // Per Dash Core, platform fields exist iff nType == MnType::Evo (1).
+    if (this.type === 1) {
       platformNodeIDBytes = hexToBytes(this.platformNodeID ?? '').toReversed()
       platformP2PPortBytes = new Uint8Array(2)
       platformHTTPPortBytes = new Uint8Array(2)
@@ -139,24 +165,34 @@ export class ProUpServTx {
 
     const payloadSigBytes = hexToBytes(this.payloadSig)
 
-    const outBytes = new Uint8Array(54 + scriptOperatorPayoutSizeBytes.byteLength + scriptOperatorPayoutBytes.byteLength + inputsHashBytes.byteLength + platformNodeIDBytes.byteLength + platformP2PPortBytes.byteLength + platformHTTPPortBytes.byteLength + payloadSigBytes.byteLength)
+    const outBytes = new Uint8Array(
+      versionBytes.byteLength +
+      typeBytes.byteLength +
+      proTxHashBytes.byteLength +
+      ipAddressBytes.byteLength +
+      portBytes.byteLength +
+      scriptOperatorPayoutSizeBytes.byteLength +
+      scriptOperatorPayoutBytes.byteLength +
+      inputsHashBytes.byteLength +
+      platformNodeIDBytes.byteLength +
+      platformP2PPortBytes.byteLength +
+      platformHTTPPortBytes.byteLength +
+      payloadSigBytes.byteLength
+    )
 
-    const payoutScriptOffset = versionBytes.byteLength + typeBytes.byteLength + proTxHashBytes.byteLength + ipAddressBytes.byteLength + portBytes.byteLength
-    const platformInfoOffset = payoutScriptOffset + scriptOperatorPayoutSizeBytes.byteLength + scriptOperatorPayoutBytes.byteLength + inputsHashBytes.byteLength
-    const payloadSigOffset = platformInfoOffset + platformNodeIDBytes.byteLength + platformP2PPortBytes.byteLength + platformHTTPPortBytes.byteLength
-
-    outBytes.set(versionBytes, 0)
-    outBytes.set(typeBytes, versionBytes.byteLength)
-    outBytes.set(proTxHashBytes, versionBytes.byteLength + typeBytes.byteLength)
-    outBytes.set(ipAddressBytes, versionBytes.byteLength + typeBytes.byteLength + proTxHashBytes.byteLength)
-    outBytes.set(portBytes, versionBytes.byteLength + typeBytes.byteLength + proTxHashBytes.byteLength + ipAddressBytes.byteLength)
-    outBytes.set(scriptOperatorPayoutSizeBytes, payoutScriptOffset)
-    outBytes.set(scriptOperatorPayoutBytes, payoutScriptOffset + scriptOperatorPayoutSizeBytes.byteLength)
-    outBytes.set(inputsHashBytes, payoutScriptOffset + scriptOperatorPayoutSizeBytes.byteLength + scriptOperatorPayoutBytes.byteLength)
-    outBytes.set(platformNodeIDBytes, platformInfoOffset)
-    outBytes.set(platformP2PPortBytes, platformInfoOffset + platformNodeIDBytes.byteLength)
-    outBytes.set(platformHTTPPortBytes, platformInfoOffset + platformNodeIDBytes.byteLength + platformP2PPortBytes.byteLength)
-    outBytes.set(payloadSigBytes, payloadSigOffset)
+    let off = 0
+    outBytes.set(versionBytes, off); off += versionBytes.byteLength
+    outBytes.set(typeBytes, off); off += typeBytes.byteLength
+    outBytes.set(proTxHashBytes, off); off += proTxHashBytes.byteLength
+    outBytes.set(ipAddressBytes, off); off += ipAddressBytes.byteLength
+    outBytes.set(portBytes, off); off += portBytes.byteLength
+    outBytes.set(scriptOperatorPayoutSizeBytes, off); off += scriptOperatorPayoutSizeBytes.byteLength
+    outBytes.set(scriptOperatorPayoutBytes, off); off += scriptOperatorPayoutBytes.byteLength
+    outBytes.set(inputsHashBytes, off); off += inputsHashBytes.byteLength
+    outBytes.set(platformNodeIDBytes, off); off += platformNodeIDBytes.byteLength
+    outBytes.set(platformP2PPortBytes, off); off += platformP2PPortBytes.byteLength
+    outBytes.set(platformHTTPPortBytes, off); off += platformHTTPPortBytes.byteLength
+    outBytes.set(payloadSigBytes, off)
 
     return outBytes
   }

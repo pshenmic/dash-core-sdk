@@ -39,7 +39,7 @@ export class ProRegTX {
 
   payloadSig: string
 
-  constructor (version: number, type: number, mode: number, collateralOutpoint: OutPoint, ipAddress: string, port: number, /* netInfo: Uint8Array, */ keyIdOwner: string, pubKeyOperator: string, keyIdVoting: string, operatorReward: number, scriptPayout: Script, inputsHash: string, platformNodeID: string, platformP2PPort: number, platformHTTPPort: number, payloadSig: string) {
+  constructor (version: number, type: number, mode: number, collateralOutpoint: OutPoint, ipAddress: string, port: number, /* netInfo: Uint8Array, */ keyIdOwner: string, pubKeyOperator: string, keyIdVoting: string, operatorReward: number, scriptPayout: Script, inputsHash: string, platformNodeID: string | undefined, platformP2PPort: number | undefined, platformHTTPPort: number | undefined, payloadSig: string) {
     this.version = version
     this.type = type
     this.mode = mode
@@ -81,53 +81,82 @@ export class ProRegTX {
     const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint16(0, true)
-    const type = dataView.getUint16(2, true)
 
-    const mode = dataView.getUint16(4, true)
-
-    const colateralOutpoint = OutPoint.fromBytes(bytes.slice(6, 42))
-
-    let ipAddress: Uint8Array
-    let port: number
-
-    if (version < 3) {
-      ipAddress = bytes.slice(42, 58)
-
-      port = dataView.getUint16(58, false)
-    } else {
+    if (version >= 3) {
       throw new Error(`Unsupported version of ProRegTX: ${version}`)
     }
 
-    const keyIdOwner = bytes.slice(60, 80)
-    const pubKeyOperator = bytes.slice(80, 128)
-    const keyIdVoting = bytes.slice(128, 148)
+    // Per Dash Core CProRegTx: nType is always serialized.
+    const type = dataView.getUint16(2, true)
+    const mode = dataView.getUint16(4, true)
 
-    const operatorReward = dataView.getUint16(148, true)
+    let cursor = 6
 
-    const scriptPayoutSize = decodeCompactSize(150, bytes)
-    const scriptPayout = Script.fromBytes(bytes.slice(150 + getCompactVariableSize(scriptPayoutSize), 150 + getCompactVariableSize(scriptPayoutSize) + Number(scriptPayoutSize)))
+    const collateralOutpoint = OutPoint.fromBytes(bytes.slice(cursor, cursor + 36))
+    cursor += 36
 
-    const inputsHashOffset = 150 + getCompactVariableSize(scriptPayoutSize) + Number(scriptPayoutSize)
-    const inputsHash = bytes.slice(inputsHashOffset, inputsHashOffset + 32)
+    const ipAddress = bytes.slice(cursor, cursor + 16)
+    cursor += 16
 
-    let platformNodeID
-    let platformP2PPort
-    let platformHTTPPort
+    const port = dataView.getUint16(cursor, false)
+    cursor += 2
 
-    let payloadSigOffset = inputsHashOffset + 32
+    const keyIdOwner = bytes.slice(cursor, cursor + 20)
+    cursor += 20
 
-    if (version === 2) {
-      platformNodeID = bytes.slice(inputsHashOffset + 32, inputsHashOffset + 32 + 20)
-      platformP2PPort = dataView.getUint16(inputsHashOffset + 32 + 20, true)
-      platformHTTPPort = dataView.getUint16(inputsHashOffset + 32 + 22, true)
+    const pubKeyOperator = bytes.slice(cursor, cursor + 48)
+    cursor += 48
 
-      payloadSigOffset += 24
+    const keyIdVoting = bytes.slice(cursor, cursor + 20)
+    cursor += 20
+
+    const operatorReward = dataView.getUint16(cursor, true)
+    cursor += 2
+
+    const scriptPayoutSize = decodeCompactSize(cursor, bytes)
+    cursor += getCompactVariableSize(scriptPayoutSize)
+    const scriptPayout = Script.fromBytes(bytes.slice(cursor, cursor + Number(scriptPayoutSize)))
+    cursor += Number(scriptPayoutSize)
+
+    const inputsHash = bytes.slice(cursor, cursor + 32)
+    cursor += 32
+
+    let platformNodeID: Uint8Array | undefined
+    let platformP2PPort: number | undefined
+    let platformHTTPPort: number | undefined
+
+    // Per Dash Core, platform fields exist iff nType == MnType::Evo (1).
+    if (type === 1) {
+      platformNodeID = bytes.slice(cursor, cursor + 20)
+      cursor += 20
+      platformP2PPort = dataView.getUint16(cursor, true)
+      cursor += 2
+      platformHTTPPort = dataView.getUint16(cursor, true)
+      cursor += 2
     }
 
-    const payloadSigSize = decodeCompactSize(payloadSigOffset, bytes)
-    const payloadSig = bytes.slice(payloadSigOffset + getCompactVariableSize(payloadSigSize), payloadSigOffset + getCompactVariableSize(payloadSigSize) + Number(payloadSigSize))
+    const payloadSigSize = decodeCompactSize(cursor, bytes)
+    cursor += getCompactVariableSize(payloadSigSize)
+    const payloadSig = bytes.slice(cursor, cursor + Number(payloadSigSize))
 
-    return new ProRegTX(version, type, mode, colateralOutpoint, bytesToIp(ipAddress), port, bytesToHex(keyIdOwner), bytesToHex(pubKeyOperator), bytesToHex(keyIdVoting), operatorReward, scriptPayout, bytesToHex(inputsHash.toReversed()), bytesToHex(platformNodeID.toReversed()), platformP2PPort, platformHTTPPort, bytesToHex(payloadSig))
+    return new ProRegTX(
+      version,
+      type,
+      mode,
+      collateralOutpoint,
+      bytesToIp(ipAddress),
+      port,
+      bytesToHex(keyIdOwner),
+      bytesToHex(pubKeyOperator),
+      bytesToHex(keyIdVoting),
+      operatorReward,
+      scriptPayout,
+      bytesToHex(inputsHash.toReversed()),
+      platformNodeID !== undefined ? bytesToHex(platformNodeID.toReversed()) : undefined,
+      platformP2PPort,
+      platformHTTPPort,
+      bytesToHex(payloadSig)
+    )
   }
 
   static fromHex (hex: string): ProRegTX {
@@ -144,11 +173,9 @@ export class ProRegTX {
     new DataView(modeBytes.buffer, modeBytes.byteOffset, modeBytes.byteLength).setUint16(0, this.mode, true)
 
     const collateralOutpointBytes = this.collateralOutpoint.bytes()
-
     const ipAddressBytes = ipToBytes(this.ipAddress)
 
     const portBytes = new Uint8Array(2)
-
     new DataView(portBytes.buffer, portBytes.byteOffset, portBytes.byteLength).setUint16(0, this.port, false)
 
     const keyIdBytes = hexToBytes(this.keyIdOwner)
@@ -156,7 +183,6 @@ export class ProRegTX {
     const keyIdVotingBytes = hexToBytes(this.keyIdVoting)
 
     const operatorRewardBytes = new Uint8Array(2)
-
     new DataView(operatorRewardBytes.buffer, operatorRewardBytes.byteOffset, operatorRewardBytes.byteLength).setUint16(0, this.operatorReward, true)
 
     const scriptPayoutBytes = this.scriptPayout.bytes()
@@ -168,7 +194,8 @@ export class ProRegTX {
     let platformP2PPortBytes: Uint8Array<ArrayBufferLike> = new Uint8Array(0)
     let platformHTTPPortBytes: Uint8Array<ArrayBufferLike> = new Uint8Array(0)
 
-    if (this.version === 2) {
+    // Per Dash Core, platform fields exist iff nType == MnType::Evo (1).
+    if (this.type === 1) {
       platformNodeIDBytes = hexToBytes(this.platformNodeID ?? '').toReversed()
       platformP2PPortBytes = new Uint8Array(2)
       platformHTTPPortBytes = new Uint8Array(2)
@@ -180,32 +207,46 @@ export class ProRegTX {
     const payloadSigBytes = hexToBytes(this.payloadSig)
     const payloadSigSizeBytes = encodeCompactSize(payloadSigBytes.byteLength)
 
-    const ipAddressOffset = versionBytes.byteLength + typeBytes.byteLength + modeBytes.byteLength + collateralOutpointBytes.byteLength
-    const pubKeyOperatorOffset = ipAddressOffset + ipAddressBytes.byteLength + portBytes.byteLength + keyIdBytes.byteLength
-    const scriptOffset = pubKeyOperatorOffset + pubKeyOperatorBytes.byteLength + keyIdVotingBytes.byteLength + operatorRewardBytes.byteLength
-    const platformInfoOffset = scriptOffset + scriptPayoutSizeBytes.byteLength + scriptPayoutBytes.byteLength + inputsHashBytes.byteLength
-    const payloadSigOffset = platformInfoOffset + platformNodeIDBytes.byteLength + platformHTTPPortBytes.byteLength + platformHTTPPortBytes.byteLength
+    const outBytes = new Uint8Array(
+      versionBytes.byteLength +
+      typeBytes.byteLength +
+      modeBytes.byteLength +
+      collateralOutpointBytes.byteLength +
+      ipAddressBytes.byteLength +
+      portBytes.byteLength +
+      keyIdBytes.byteLength +
+      pubKeyOperatorBytes.byteLength +
+      keyIdVotingBytes.byteLength +
+      operatorRewardBytes.byteLength +
+      scriptPayoutSizeBytes.byteLength +
+      scriptPayoutBytes.byteLength +
+      inputsHashBytes.byteLength +
+      platformNodeIDBytes.byteLength +
+      platformP2PPortBytes.byteLength +
+      platformHTTPPortBytes.byteLength +
+      payloadSigSizeBytes.byteLength +
+      payloadSigBytes.byteLength
+    )
 
-    const outBytes = new Uint8Array(182 + scriptPayoutSizeBytes.byteLength + scriptPayoutBytes.byteLength + platformNodeIDBytes.byteLength + platformP2PPortBytes.byteLength + platformHTTPPortBytes.byteLength + payloadSigSizeBytes.byteLength + payloadSigBytes.byteLength)
-
-    outBytes.set(versionBytes, 0)
-    outBytes.set(typeBytes, versionBytes.byteLength)
-    outBytes.set(modeBytes, versionBytes.byteLength + typeBytes.byteLength)
-    outBytes.set(collateralOutpointBytes, versionBytes.byteLength + typeBytes.byteLength + modeBytes.byteLength)
-    outBytes.set(ipAddressBytes, ipAddressOffset)
-    outBytes.set(portBytes, ipAddressOffset + ipAddressBytes.byteLength)
-    outBytes.set(keyIdBytes, ipAddressOffset + ipAddressBytes.byteLength + portBytes.byteLength)
-    outBytes.set(pubKeyOperatorBytes, pubKeyOperatorOffset)
-    outBytes.set(keyIdVotingBytes, pubKeyOperatorOffset + pubKeyOperatorBytes.byteLength)
-    outBytes.set(operatorRewardBytes, pubKeyOperatorOffset + pubKeyOperatorBytes.byteLength + keyIdVotingBytes.byteLength)
-    outBytes.set(scriptPayoutSizeBytes, scriptOffset)
-    outBytes.set(scriptPayoutBytes, scriptOffset + scriptPayoutSizeBytes.byteLength)
-    outBytes.set(inputsHashBytes, scriptOffset + scriptPayoutSizeBytes.byteLength + scriptPayoutBytes.byteLength)
-    outBytes.set(platformNodeIDBytes, platformInfoOffset)
-    outBytes.set(platformP2PPortBytes, platformInfoOffset + platformNodeIDBytes.byteLength)
-    outBytes.set(platformHTTPPortBytes, platformInfoOffset + platformNodeIDBytes.byteLength + platformHTTPPortBytes.byteLength)
-    outBytes.set(payloadSigSizeBytes, payloadSigOffset)
-    outBytes.set(payloadSigBytes, payloadSigOffset + payloadSigSizeBytes.byteLength)
+    let off = 0
+    outBytes.set(versionBytes, off); off += versionBytes.byteLength
+    outBytes.set(typeBytes, off); off += typeBytes.byteLength
+    outBytes.set(modeBytes, off); off += modeBytes.byteLength
+    outBytes.set(collateralOutpointBytes, off); off += collateralOutpointBytes.byteLength
+    outBytes.set(ipAddressBytes, off); off += ipAddressBytes.byteLength
+    outBytes.set(portBytes, off); off += portBytes.byteLength
+    outBytes.set(keyIdBytes, off); off += keyIdBytes.byteLength
+    outBytes.set(pubKeyOperatorBytes, off); off += pubKeyOperatorBytes.byteLength
+    outBytes.set(keyIdVotingBytes, off); off += keyIdVotingBytes.byteLength
+    outBytes.set(operatorRewardBytes, off); off += operatorRewardBytes.byteLength
+    outBytes.set(scriptPayoutSizeBytes, off); off += scriptPayoutSizeBytes.byteLength
+    outBytes.set(scriptPayoutBytes, off); off += scriptPayoutBytes.byteLength
+    outBytes.set(inputsHashBytes, off); off += inputsHashBytes.byteLength
+    outBytes.set(platformNodeIDBytes, off); off += platformNodeIDBytes.byteLength
+    outBytes.set(platformP2PPortBytes, off); off += platformP2PPortBytes.byteLength
+    outBytes.set(platformHTTPPortBytes, off); off += platformHTTPPortBytes.byteLength
+    outBytes.set(payloadSigSizeBytes, off); off += payloadSigSizeBytes.byteLength
+    outBytes.set(payloadSigBytes, off)
 
     return outBytes
   }
