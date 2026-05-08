@@ -54,22 +54,26 @@ export class Input {
   }
 
   static fromBytes (bytes: Uint8Array): Input {
-    const txIdBytes = bytes.slice(0, 32)
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
-    const vOutBytes = new DataView(bytes.slice(32, 36).buffer)
+    const txIdBytes = bytes.slice(0, 32)
+    const vOut = view.getUint32(32, true)
 
     const scriptSigSize = decodeCompactSize(36, bytes)
     const scriptBytesSize = getCompactVariableSize(scriptSigSize)
 
-    const scriptSigBytes = bytes.slice(36 + scriptBytesSize, 36 + scriptBytesSize + Number(scriptSigSize))
+    const scriptStart = 36 + scriptBytesSize
+    const scriptEnd = scriptStart + Number(scriptSigSize)
 
-    const sequenceBytes = new DataView(bytes.slice(36 + scriptBytesSize + Number(scriptSigSize), 36 + scriptBytesSize + Number(scriptSigSize) + 4).buffer)
+    const scriptSigBytes = bytes.slice(scriptStart, scriptEnd)
+
+    const sequence = view.getUint32(scriptEnd, true)
 
     return new Input(
       txIdBytes.toReversed(),
-      vOutBytes.getUint32(0, true),
+      vOut,
       Script.fromBytes(scriptSigBytes),
-      sequenceBytes.getUint32(0, true)
+      sequence
     )
   }
 
