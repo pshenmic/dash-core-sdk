@@ -198,10 +198,9 @@ export class Script {
   }
 
   bytes(): Uint8Array {
-    // 1. Считаем точный размер будущего буфера
     let totalSize = 0;
     for (const chunk of this.#parsedScript) {
-      totalSize += 1; // Сам опекод
+      totalSize += 1;
       if (chunk.data) {
         const dataLen = chunk.data.byteLength;
         if (chunk.opcode === OPCODES.OP_PUSHDATA1) totalSize += 1;
@@ -211,15 +210,12 @@ export class Script {
       }
     }
 
-    // 2. Создаем буфер и DataView
     const buffer = new ArrayBuffer(totalSize);
     const view = new DataView(buffer);
     const uint8 = new Uint8Array(buffer);
     let offset = 0;
 
-    // 3. Записываем данные без боли в голове
     for (const chunk of this.#parsedScript) {
-      // Пишем опекод
       view.setUint8(offset++, chunk.opcode);
 
       if (chunk.data) {
@@ -229,14 +225,13 @@ export class Script {
         if (chunk.opcode === OPCODES.OP_PUSHDATA1) {
           view.setUint8(offset++, len);
         } else if (chunk.opcode === OPCODES.OP_PUSHDATA2) {
-          view.setUint16(offset, len, true); // true = Little Endian (младший байт первым)
+          view.setUint16(offset, len, true);
           offset += 2;
         } else if (chunk.opcode === OPCODES.OP_PUSHDATA4) {
-          view.setUint32(offset, len, true); // true = Little Endian
+          view.setUint32(offset, len, true);
           offset += 4;
         }
 
-        // Копируем сами данные (это в разы быстрее, чем push(...))
         uint8.set(data, offset);
         offset += len;
       }
