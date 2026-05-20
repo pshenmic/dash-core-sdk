@@ -14,7 +14,10 @@ export interface ScriptChunk {
   data?: ArrayBuffer
 }
 
-export type NetworkLike = Network | keyof typeof Network
+// Accept lowercase variants too: networkValueToEnumValue already normalises
+// case at runtime (uses .toLowerCase()), but the type artificially rejected
+// the lowercase form callers commonly carry around.
+export type NetworkLike = Network | keyof typeof Network | Lowercase<keyof typeof Network>
 
 export type ExtraPayload =
   ProRegTX

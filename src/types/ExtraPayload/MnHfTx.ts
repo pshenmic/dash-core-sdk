@@ -12,7 +12,7 @@ export class MnHfTx {
   }
 
   static fromBytes (bytes: Uint8Array): MnHfTx {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint8(0)
 
@@ -27,7 +27,7 @@ export class MnHfTx {
 
   bytes (): Uint8Array {
     const versionByte = new Uint8Array(1)
-    new DataView(versionByte.buffer).setUint8(0, this.version)
+    new DataView(versionByte.buffer, versionByte.byteOffset, versionByte.byteLength).setUint8(0, this.version)
 
     const commitmentBytes = this.commitment.bytes()
 

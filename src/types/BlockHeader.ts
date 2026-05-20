@@ -51,7 +51,7 @@ export class BlockHeader {
   }
 
   static fromBytes (bytes: Uint8Array): BlockHeader {
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const version = dataView.getUint32(0, true)
 

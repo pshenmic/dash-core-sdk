@@ -20,7 +20,7 @@ export class Output {
   }
 
   static fromBytes (bytes: Uint8Array): Output {
-    const properties = new DataView(bytes.buffer)
+    const properties = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     const satoshis = properties.getBigUint64(0, true)
 

@@ -107,7 +107,7 @@ export class Script {
 
     const chunks: ScriptChunk[] = []
 
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
     for (let i = 0; i < bytes.length; i++) {
       const opcode = dataView.getUint8(i)
@@ -125,8 +125,8 @@ export class Script {
       } else if (opcode === OPCODES.OP_PUSHDATA1) {
         const bytesForPush = dataView.getUint8(i + 1)
 
-        chunk.data = dataView.buffer.slice(i + 1, i + 1 + bytesForPush) as ArrayBuffer
-        i += bytesForPush
+        chunk.data = dataView.buffer.slice(i + 2, i + 2 + bytesForPush) as ArrayBuffer
+        i += bytesForPush + 1
       } else if (opcode === OPCODES.OP_PUSHDATA2) {
         const bytesForPush = dataView.getUint16(i + 1, true)
 
@@ -197,30 +197,47 @@ export class Script {
     return out.join(' ')
   }
 
-  bytes (): Uint8Array<ArrayBufferLike> {
-    let out: Uint8Array = new Uint8Array<ArrayBuffer>(new ArrayBuffer(0))
-
-    for (let i = 0; i < this.#parsedScript.length; i++) {
-      const chunk = this.#parsedScript[i]
-
-      const { data } = chunk
-
-      const dataLength = data?.byteLength ?? 0
-
-      const tmpBytes = new Uint8Array(1 + dataLength + out.byteLength)
-
-      tmpBytes.set(out, 0)
-
-      tmpBytes.set([chunk.opcode], out.byteLength)
-
-      if (chunk.data != null) {
-        tmpBytes.set(new Uint8Array(chunk.data), out.byteLength + 1)
+  bytes(): Uint8Array {
+    let totalSize = 0;
+    for (const chunk of this.#parsedScript) {
+      totalSize += 1;
+      if (chunk.data) {
+        const dataLen = chunk.data.byteLength;
+        if (chunk.opcode === OPCODES.OP_PUSHDATA1) totalSize += 1;
+        else if (chunk.opcode === OPCODES.OP_PUSHDATA2) totalSize += 2;
+        else if (chunk.opcode === OPCODES.OP_PUSHDATA4) totalSize += 4;
+        totalSize += dataLen;
       }
-
-      out = tmpBytes
     }
 
-    return out
+    const buffer = new ArrayBuffer(totalSize);
+    const view = new DataView(buffer);
+    const uint8 = new Uint8Array(buffer);
+    let offset = 0;
+
+    for (const chunk of this.#parsedScript) {
+      view.setUint8(offset++, chunk.opcode);
+
+      if (chunk.data) {
+        const data = new Uint8Array(chunk.data);
+        const len = data.length;
+
+        if (chunk.opcode === OPCODES.OP_PUSHDATA1) {
+          view.setUint8(offset++, len);
+        } else if (chunk.opcode === OPCODES.OP_PUSHDATA2) {
+          view.setUint16(offset, len, true);
+          offset += 2;
+        } else if (chunk.opcode === OPCODES.OP_PUSHDATA4) {
+          view.setUint32(offset, len, true);
+          offset += 4;
+        }
+
+        uint8.set(data, offset);
+        offset += len;
+      }
+    }
+
+    return uint8;
   }
 
   hex (): string {
