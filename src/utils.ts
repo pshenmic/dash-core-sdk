@@ -127,7 +127,7 @@ export function SHA256RIPEMD160 (data: Uint8Array): Uint8Array {
   return ripemd160(firstStage)
 }
 
-export function networkValueToEnumValue (value: Network | keyof typeof Network): Network {
+export function networkValueToEnumValue (value: NetworkLike): Network {
   if (typeof value === 'string') {
     if (value.toLowerCase() === 'mainnet') {
       return Network.Mainnet
