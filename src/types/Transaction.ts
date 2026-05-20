@@ -176,32 +176,27 @@ export class Transaction {
     this.inputs[inputIndex].scriptSig = inputScript
   }
 
-  // Sign every input with the same key. Convenient for single-address
-  // wallets; insufficient for HD wallets that spend UTXOs from multiple
-  // addresses (each input needs its own derived key) — use signInputs
-  // or signInput for those cases.
-  sign (privateKey: PrivateKey): void {
+  // Sign all inputs of this transaction.
+  //   - `PrivateKey`        — sign every input with the same key
+  //                           (single-address wallets).
+  //   - `PrivateKey[]`      — sign each input with its own key (parallel
+  //                           arrays: inputs[i] is signed with privateKey[i]).
+  //                           Typical use case is an HD wallet spending UTXOs
+  //                           from multiple addresses in one transaction.
+  //                           Throws on length mismatch.
+  sign (privateKey: PrivateKey | PrivateKey[]): void {
+    if (Array.isArray(privateKey)) {
+      if (this.inputs.length !== privateKey.length) {
+        throw new Error(`Input/key count mismatch: ${this.inputs.length} inputs vs ${privateKey.length} keys`)
+      }
+      for (let i = 0; i < this.inputs.length; i++) {
+        this.#signInput(privateKey[i], i)
+      }
+      return
+    }
+
     for (let i = 0; i < this.inputs.length; i++) {
       this.#signInput(privateKey, i)
-    }
-  }
-
-  // Sign a specific input with the given key. The other inputs are not
-  // touched, so callers can compose per-input signing for HD wallets
-  // whose UTXOs derive from different keys.
-  signInput (privateKey: PrivateKey, inputIndex: number): void {
-    this.#signInput(privateKey, inputIndex)
-  }
-
-  // Sign each input with its own key (parallel arrays — inputs[i] is signed
-  // with privateKeys[i]). Throws on length mismatch. Typical use case is an
-  // HD wallet spending UTXOs from multiple addresses in one transaction.
-  signInputs (privateKeys: PrivateKey[]): void {
-    if (this.inputs.length !== privateKeys.length) {
-      throw new Error(`Input/key count mismatch: ${this.inputs.length} inputs vs ${privateKeys.length} keys`)
-    }
-    for (let i = 0; i < this.inputs.length; i++) {
-      this.#signInput(privateKeys[i], i)
     }
   }
 
