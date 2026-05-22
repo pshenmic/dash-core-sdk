@@ -35,5 +35,3 @@ jobs:
             echo "LATEST=true" >> $GITHUB_ENV
             npm publish ./dist --tag latest
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
