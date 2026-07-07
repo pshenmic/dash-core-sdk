@@ -156,17 +156,22 @@ export class Transaction {
 
     const inputScript = new Script()
 
-    let sigOpcode: OPCODES_ENUM
+    // ECDSA DER signatures are variable length: each of the r/s integers is
+    // 1..33 bytes (a 32-byte scalar plus an optional 0x00 sign-padding byte),
+    // and either loses its high byte whenever the leading byte would be < 0x80.
+    // Per BIP-66 strict DER encoding the sequence is therefore between 8 bytes
+    // (r=s=1 byte) and 72 bytes (r=s=33 bytes); with the trailing sighash byte
+    // the pushed value spans 9..73 bytes. secp256k1.sign here is deterministic
+    // (RFC6979 + lowS), so a short DER encoding is stable for a given tx+key and
+    // must be pushed as-is instead of being rejected as an "invalid" size.
+    // https://github.com/bitcoin/bips/blob/master/bip-0066.mediawiki
+    const signatureSize = signatureWithSighash.byteLength
 
-    if (signatureWithSighash.byteLength === 71) {
-      sigOpcode = 'OP_PUSHBYTES_71'
-    } else if (signatureWithSighash.byteLength === 72) {
-      sigOpcode = 'OP_PUSHBYTES_72'
-    } else if (signatureWithSighash.byteLength === 73) {
-      sigOpcode = 'OP_PUSHBYTES_73'
-    } else {
-      throw new Error('Invalid signature size')
+    if (signatureSize < 9 || signatureSize > 73) {
+      throw new Error(`Invalid signature size ${signatureSize}, expected 9..73 bytes (DER signature + sighash)`)
     }
+
+    const sigOpcode = `OP_PUSHBYTES_${signatureSize}` as OPCODES_ENUM
 
     inputScript.pushOpCode(sigOpcode, signatureWithSighash)
     inputScript.pushOpCode('OP_PUSHBYTES_33', publicKey.inner)
