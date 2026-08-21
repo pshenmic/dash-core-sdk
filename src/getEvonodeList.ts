@@ -1,10 +1,9 @@
-import { MasternodeList } from './grpcConnectionPool.js'
-
 const REQUEST_TIMEOUT = 8000
 const RETRY_BACKOFF = 1500
 
 /**
- * Query Platform Explorer for the list of active validators (DAPI nodes).
+ * Query Platform Explorer for the list of active validators (DAPI nodes) and
+ * map them to gRPC-web base URLs ready to be dialed.
  *
  * The endpoint is flaky — it either answers fast or hangs until a connect
  * timeout — so a single request that fails makes GRPCConnectionPool fall back
@@ -16,7 +15,7 @@ const RETRY_BACKOFF = 1500
  * @param network - target Dash network
  * @param attempts - maximum number of attempts (optional, defaults to 4)
  */
-export default async function getDAPINodeList (network: 'testnet' | 'mainnet', attempts = 4): Promise<MasternodeList> {
+export default async function getDAPINodeList (network: 'testnet' | 'mainnet', attempts = 4): Promise<string[]> {
   const url = `https://${network === 'mainnet' ? '' : 'testnet.'}platform-explorer.pshenmic.dev/validators?isActive=true`
 
   let lastError: unknown
