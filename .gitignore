@@ -1,4 +1,5 @@
 dist
 .idea
+.claude
 proto/generated
 node_modules
