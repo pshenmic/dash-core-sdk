@@ -46,6 +46,8 @@
     "@noble/hashes": "^2.0.1",
     "@noble/secp256k1": "^3.0.0",
     "@protobuf-ts/grpcweb-transport": "^2.11.1",
+    "@protobuf-ts/runtime": "^2.11.1",
+    "@protobuf-ts/runtime-rpc": "^2.11.1",
     "@scure/base": "^2.0.0",
     "@scure/btc-signer": "^2.0.1",
     "bloom-filter": "^0.2.0",
