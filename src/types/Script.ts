@@ -197,47 +197,47 @@ export class Script {
     return out.join(' ')
   }
 
-  bytes(): Uint8Array {
-    let totalSize = 0;
+  bytes (): Uint8Array {
+    let totalSize = 0
     for (const chunk of this.#parsedScript) {
-      totalSize += 1;
-      if (chunk.data) {
-        const dataLen = chunk.data.byteLength;
-        if (chunk.opcode === OPCODES.OP_PUSHDATA1) totalSize += 1;
-        else if (chunk.opcode === OPCODES.OP_PUSHDATA2) totalSize += 2;
-        else if (chunk.opcode === OPCODES.OP_PUSHDATA4) totalSize += 4;
-        totalSize += dataLen;
+      totalSize += 1
+      if (chunk.data != null) {
+        const dataLen = chunk.data.byteLength
+        if (chunk.opcode === OPCODES.OP_PUSHDATA1) totalSize += 1
+        else if (chunk.opcode === OPCODES.OP_PUSHDATA2) totalSize += 2
+        else if (chunk.opcode === OPCODES.OP_PUSHDATA4) totalSize += 4
+        totalSize += dataLen
       }
     }
 
-    const buffer = new ArrayBuffer(totalSize);
-    const view = new DataView(buffer);
-    const uint8 = new Uint8Array(buffer);
-    let offset = 0;
+    const buffer = new ArrayBuffer(totalSize)
+    const view = new DataView(buffer)
+    const uint8 = new Uint8Array(buffer)
+    let offset = 0
 
     for (const chunk of this.#parsedScript) {
-      view.setUint8(offset++, chunk.opcode);
+      view.setUint8(offset++, chunk.opcode)
 
-      if (chunk.data) {
-        const data = new Uint8Array(chunk.data);
-        const len = data.length;
+      if (chunk.data != null) {
+        const data = new Uint8Array(chunk.data)
+        const len = data.length
 
         if (chunk.opcode === OPCODES.OP_PUSHDATA1) {
-          view.setUint8(offset++, len);
+          view.setUint8(offset++, len)
         } else if (chunk.opcode === OPCODES.OP_PUSHDATA2) {
-          view.setUint16(offset, len, true);
-          offset += 2;
+          view.setUint16(offset, len, true)
+          offset += 2
         } else if (chunk.opcode === OPCODES.OP_PUSHDATA4) {
-          view.setUint32(offset, len, true);
-          offset += 4;
+          view.setUint32(offset, len, true)
+          offset += 4
         }
 
-        uint8.set(data, offset);
-        offset += len;
+        uint8.set(data, offset)
+        offset += len
       }
     }
 
-    return uint8;
+    return uint8
   }
 
   hex (): string {
