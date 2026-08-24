@@ -1,5 +1,5 @@
 import getEvonodeList from './getEvonodeList.js'
-import { GrpcWebFetchTransport } from '@protobuf-ts/grpcweb-transport'
+import createCoreClient from './createCoreClient.js'
 import { getRandomArrayItem } from './utils.js'
 import { CoreClient } from '../proto/generated/core.client.js'
 import { GetBlockchainStatusRequest, GetBlockchainStatusResponse_Status } from '../proto/generated/core.js'
@@ -52,13 +52,6 @@ const seedNodes = {
     // 'https://3.0.60.103',
     // 'https://34.211.174.194'
   ]
-}
-
-const createClient = (url: string, abortController?: AbortController): CoreClient => {
-  return new CoreClient(new GrpcWebFetchTransport({
-    baseUrl: url,
-    abort: abortController?.signal
-  }))
 }
 
 export default class GRPCConnectionPool {
@@ -127,7 +120,9 @@ export default class GRPCConnectionPool {
    * @param poolLimit - maximum number of nodes to keep
    */
   async _discover (network: 'testnet' | 'mainnet', poolLimit: number): Promise<void> {
-    const evonodeUrls = await getEvonodeList(network)
+    // Query through the nodes already known, so discovery never depends on a
+    // third-party index being reachable
+    const evonodeUrls = await getEvonodeList([...this.dapiUrls])
 
     const dapiUrls = [...seedNodes[network]]
 
@@ -138,7 +133,7 @@ export default class GRPCConnectionPool {
       }
 
       try {
-        const client = createClient(url)
+        const client = createCoreClient(url)
 
         const { response } = await client.getBlockchainStatus(GetBlockchainStatusRequest.fromJson({}))
 
@@ -203,6 +198,6 @@ export default class GRPCConnectionPool {
 
     const dapiUrl = getRandomArrayItem(this.dapiUrls)
 
-    return createClient(dapiUrl, abortController)
+    return createCoreClient(dapiUrl, abortController)
   }
 }
