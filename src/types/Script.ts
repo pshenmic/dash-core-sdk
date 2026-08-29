@@ -116,27 +116,35 @@ export class Script {
         opcode
       }
 
+      // A push carries its size (implicit for OP_PUSHBYTES_X, explicit for the
+      // OP_PUSHDATA family) followed by that many bytes of data. Scripts are
+      // not always well formed - a coinbase scriptSig is arbitrary miner data -
+      // so a push whose size or payload runs past the end of the script is kept
+      // as a bare opcode instead of reading out of bounds.
+      let sizeBytes = 0
+      let bytesForPush = -1
+
       if (opcode < OPCODES.OP_PUSHDATA1 && opcode > 0) {
         // process OP_PUSHBYTES_X
 
-        chunk.data = dataView.buffer.slice(i + 1, i + 1 + opcode) as ArrayBuffer
+        bytesForPush = opcode
+      } else if (opcode === OPCODES.OP_PUSHDATA1 && i + 1 < bytes.length) {
+        sizeBytes = 1
+        bytesForPush = dataView.getUint8(i + 1)
+      } else if (opcode === OPCODES.OP_PUSHDATA2 && i + 2 < bytes.length) {
+        sizeBytes = 2
+        bytesForPush = dataView.getUint16(i + 1, true)
+      } else if (opcode === OPCODES.OP_PUSHDATA4 && i + 4 < bytes.length) {
+        sizeBytes = 4
+        bytesForPush = dataView.getUint32(i + 1, true)
+      }
 
-        i += opcode
-      } else if (opcode === OPCODES.OP_PUSHDATA1) {
-        const bytesForPush = dataView.getUint8(i + 1)
+      const dataStart = i + 1 + sizeBytes
 
-        chunk.data = dataView.buffer.slice(i + 2, i + 2 + bytesForPush) as ArrayBuffer
-        i += bytesForPush + 1
-      } else if (opcode === OPCODES.OP_PUSHDATA2) {
-        const bytesForPush = dataView.getUint16(i + 1, true)
+      if (bytesForPush >= 0 && dataStart + bytesForPush <= bytes.length) {
+        chunk.data = bytes.slice(dataStart, dataStart + bytesForPush).buffer
 
-        chunk.data = dataView.buffer.slice(i + 3, i + 3 + bytesForPush) as ArrayBuffer
-        i += bytesForPush + 2
-      } else if (opcode === OPCODES.OP_PUSHDATA4) {
-        const bytesForPush = dataView.getUint32(i + 1, true)
-
-        chunk.data = dataView.buffer.slice(i + 5, i + 5 + bytesForPush) as ArrayBuffer
-        i += bytesForPush + 4
+        i += sizeBytes + bytesForPush
       }
 
       chunks.push(chunk)

@@ -28,7 +28,7 @@ export class Output {
 
     const scriptPadding = 8 + getCompactVariableSize(scriptSize)
 
-    const script = new Script(new Uint8Array(properties.buffer.slice(scriptPadding, scriptPadding + Number(scriptSize))))
+    const script = new Script(bytes.slice(scriptPadding, scriptPadding + Number(scriptSize)))
 
     return new Output(satoshis, script)
   }
