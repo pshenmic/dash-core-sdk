@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals'
+import { encode } from 'cbor2'
 
 const subscribeToMasternodeList = jest.fn<(request: unknown) => { responses: AsyncIterable<{ masternodeListDiff: Uint8Array }> }>()
 const createCoreClient = jest.fn<(url: string, abortController?: AbortController) => unknown>()
@@ -8,47 +9,6 @@ jest.unstable_mockModule('../src/createCoreClient.js', () => ({
 }))
 
 const { default: getEvonodeList } = await import('../src/getEvonodeList.js')
-const { default: decodeCBOR } = await import('../src/decodeCBOR.js')
-
-/**
- * Encode the subset of CBOR the tests need, so fixtures stay readable.
- */
-function encodeCBOR (value: unknown): Uint8Array {
-  const out: number[] = []
-
-  const head = (major: number, argument: number): void => {
-    if (argument < 24) {
-      out.push((major << 5) | argument)
-    } else if (argument < 256) {
-      out.push((major << 5) | 24, argument)
-    } else {
-      out.push((major << 5) | 25, argument >> 8, argument & 0xff)
-    }
-  }
-
-  const write = (v: unknown): void => {
-    if (typeof v === 'number') {
-      head(0, v)
-    } else if (typeof v === 'boolean') {
-      out.push(v ? 0xf5 : 0xf4)
-    } else if (typeof v === 'string') {
-      const encoded = new TextEncoder().encode(v)
-      head(3, encoded.length)
-      out.push(...encoded)
-    } else if (Array.isArray(v)) {
-      head(4, v.length)
-      v.forEach(write)
-    } else if (v != null) {
-      const entries = Object.entries(v as Record<string, unknown>)
-      head(5, entries.length)
-      entries.forEach(([k, item]) => { write(k); write(item) })
-    }
-  }
-
-  write(value)
-
-  return new Uint8Array(out)
-}
 
 const streamOf = (diff: Uint8Array): { responses: AsyncIterable<{ masternodeListDiff: Uint8Array }> } => ({
   responses: {
@@ -103,14 +63,8 @@ describe('getEvonodeList', () => {
     return result.v
   }
 
-  it('should round-trip a fixture through the real decoder', () => {
-    const diff = encodeCBOR({ mnList: [{ nType: 1, isValid: true }] })
-
-    expect(decodeCBOR(diff)).toEqual({ mnList: [{ nType: 1, isValid: true }] })
-  })
-
   it('should map evonodes to gRPC-web base URLs', async () => {
-    subscribeToMasternodeList.mockReturnValue(streamOf(encodeCBOR({
+    subscribeToMasternodeList.mockReturnValue(streamOf(encode({
       mnList: [
         { nType: 1, isValid: true, service: '68.67.122.23:19999', platformHTTPPort: 1443 },
         { nType: 1, isValid: true, service: '1.2.3.4:9999', platformHTTPPort: 443 }
@@ -124,7 +78,7 @@ describe('getEvonodeList', () => {
   })
 
   it('should skip regular masternodes, invalid entries and entries without a platform port', async () => {
-    subscribeToMasternodeList.mockReturnValue(streamOf(encodeCBOR({
+    subscribeToMasternodeList.mockReturnValue(streamOf(encode({
       mnList: [
         { nType: 0, isValid: true, service: '1.1.1.1:19999', platformHTTPPort: 1443 },
         { nType: 1, isValid: false, service: '2.2.2.2:19999', platformHTTPPort: 1443 },
@@ -139,7 +93,7 @@ describe('getEvonodeList', () => {
   it('should rotate over the supplied nodes across attempts', async () => {
     subscribeToMasternodeList
       .mockImplementationOnce(() => { throw new Error('node a down') })
-      .mockReturnValueOnce(streamOf(encodeCBOR({ mnList: [] })))
+      .mockReturnValueOnce(streamOf(encode({ mnList: [] })))
 
     await expect(runWithTimers(getEvonodeList(NODES))).resolves.toEqual([])
 
@@ -172,7 +126,7 @@ describe('getEvonodeList', () => {
   })
 
   it('should fail when the diff carries no mnList', async () => {
-    subscribeToMasternodeList.mockReturnValue(streamOf(encodeCBOR({ blockHash: 'deadbeef' })))
+    subscribeToMasternodeList.mockReturnValue(streamOf(encode({ blockHash: 'deadbeef' })))
 
     await expect(runWithTimers(getEvonodeList(NODES)))
       .rejects.toThrow('Masternode list diff from DAPI carries no mnList')

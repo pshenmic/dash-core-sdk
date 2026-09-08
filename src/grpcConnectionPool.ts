@@ -3,16 +3,7 @@ import createCoreClient from './createCoreClient.js'
 import { getRandomArrayItem } from './utils.js'
 import { CoreClient } from '../proto/generated/core.client.js'
 import { GetBlockchainStatusRequest, GetBlockchainStatusResponse_Status } from '../proto/generated/core.js'
-
-const GRPC_DEFAULT_POOL_LIMIT = 5
-
-/**
- * Minimal delay between two background refresh attempts.
- *
- * getClient runs on every SDK call, so a degraded pool would otherwise fire a
- * validator lookup per call while the previous one is still cooling down.
- */
-const POOL_REFRESH_COOLDOWN = 30000
+import { GRPC_DEFAULT_POOL_LIMIT, POOL_REFRESH_COOLDOWN } from './constants.js'
 
 export type MasternodeList = Record<string, MasternodeInfo>
 export interface GRPCOptions {

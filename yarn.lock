@@ -383,6 +383,11 @@
     "@typescript/vfs" "^1.5.2"
     typescript "5.4.5"
 
+"@cto.af/wtf8@0.0.5":
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/@cto.af/wtf8/-/wtf8-0.0.5.tgz#968ab98ca2036c7d104e95b449e782dbf0c4a80f"
+  integrity sha512-LfUFi+Vv4eDzj+XAtR89e3wwjXA/NZjUSwU5NhwbBrLecxPaBYFy3exCuc1j+D4UZeOVdqlsl8G7LmOt18V0tg==
+
 "@dashevo/x11-hash-js@^1.0.2":
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/@dashevo/x11-hash-js/-/x11-hash-js-1.0.2.tgz#a9d7ef55d57654f7eae04825cf232f7fd20acdd6"
@@ -1855,6 +1860,13 @@ case-anything@^2.1.13:
   version "2.1.13"
   resolved "https://registry.yarnpkg.com/case-anything/-/case-anything-2.1.13.tgz#0cdc16278cb29a7fcdeb072400da3f342ba329e9"
   integrity sha512-zlOQ80VrQ2Ue+ymH5OuM/DlDq64mEm+B9UTdHULv5osUMD6HalNTblf2b1u/m6QecjsnOkBpqVZ+XPwIVsy7Ng==
+
+cbor2@^2.3.0:
+  version "2.3.0"
+  resolved "https://registry.yarnpkg.com/cbor2/-/cbor2-2.3.0.tgz#678b39143cada217121307643cf6f28be2c72960"
+  integrity sha512-76WB3hq8BoaGkMkBVJ27fW5LJU+qqDLEpgRNCG/SYKhODWXpVPOTD4UcUto3IEzYLA52nsvbhb0wabhHDn3qXg==
+  dependencies:
+    "@cto.af/wtf8" "0.0.5"
 
 chalk@^4.0.0, chalk@^4.1.2:
   version "4.1.2"

@@ -1,5 +1,5 @@
 import createCoreClient from './createCoreClient.js'
-import decodeCBOR from './decodeCBOR.js'
+import { decode } from 'cbor2'
 import { MasternodeListRequest } from '../proto/generated/core.js'
 
 const REQUEST_TIMEOUT = 8000
@@ -20,10 +20,13 @@ interface MasternodeListEntry {
 /**
  * Map a masternode list diff to the gRPC-web base URLs of its evonodes.
  *
+ * DAPI serialises the diff as CBOR rather than protobuf, so it has to be
+ * decoded before the evonode entries can be read.
+ *
  * @param masternodeListDiff - CBOR encoded diff as DAPI returns it
  */
 function toEvonodeUrls (masternodeListDiff: Uint8Array): string[] {
-  const diff = decodeCBOR(masternodeListDiff) as { mnList?: MasternodeListEntry[] }
+  const diff = decode<{ mnList?: MasternodeListEntry[] }>(masternodeListDiff)
   const mnList = diff?.mnList
 
   if (!Array.isArray(mnList)) {
