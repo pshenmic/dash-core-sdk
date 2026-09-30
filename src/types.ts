@@ -8,6 +8,9 @@ import { QcTx } from './types/ExtraPayload/QcTx.js'
 import { MnHfTx } from './types/ExtraPayload/MnHfTx.js'
 import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './types/ExtraPayload/AssetUnlockTx.js'
+import { ProDisTx } from './types/ExtraPayload/ProDisTx.js'
+import { ProUpShareTx } from './types/ExtraPayload/ProUpShareTx.js'
+import { ProUpSharedRegTx } from './types/ExtraPayload/ProUpSharedRegTx.js'
 
 export interface ScriptChunk {
   opcode: number
@@ -29,6 +32,9 @@ export type ExtraPayload =
   | MnHfTx
   | AssetLockTx
   | AssetUnlockTx
+  | ProDisTx
+  | ProUpShareTx
+  | ProUpSharedRegTx
 
 export interface TransactionJSON {
   version: number
@@ -46,6 +52,9 @@ export interface TransactionJSON {
   | MnHfTxJSON
   | AssetLockTxJSON
   | AssetUnlockTxJSON
+  | ProDisTxJSON
+  | ProUpShareTxJSON
+  | ProUpSharedRegTxJSON
   | null
 }
 
@@ -159,6 +168,31 @@ export interface ProUpRevTxJSON {
   reason: number
   inputsHash: string
   payloadSig: string
+}
+
+export interface ProDisTxJSON {
+  version: number
+  proTxHash: string
+  actorIndex: number
+  sigs: string[]
+}
+
+export interface ProUpShareTxJSON {
+  version: number
+  proTxHash: string
+  shareIndex: number
+  scriptReward: string
+  inputsHash: string
+  payloadSig: string
+}
+
+export interface ProUpSharedRegTxJSON {
+  version: number
+  proTxHash: string
+  pubKeyOperator: string
+  keyIdVoting: string
+  inputsHash: string
+  sigs: string[]
 }
 
 export interface CbTxJSON {

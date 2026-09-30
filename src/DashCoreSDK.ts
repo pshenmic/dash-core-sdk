@@ -31,6 +31,9 @@ import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './types/ExtraPayload/AssetUnlockTx.js'
 import { CbTx } from './types/ExtraPayload/CbTx.js'
 import { MnHfTx } from './types/ExtraPayload/MnHfTx.js'
+import { ProDisTx } from './types/ExtraPayload/ProDisTx.js'
+import { ProUpShareTx } from './types/ExtraPayload/ProUpShareTx.js'
+import { ProUpSharedRegTx } from './types/ExtraPayload/ProUpSharedRegTx.js'
 import { ProRegTX } from './types/ExtraPayload/ProRegTX.js'
 import { ProUpRegTx } from './types/ExtraPayload/ProUpRegTx.js'
 import { ProUpRevTx } from './types/ExtraPayload/ProUpRevTx.js'
@@ -94,10 +97,13 @@ const extraPayload = {
   AssetUnlockTx,
   CbTx,
   MnHfTx,
+  ProDisTx,
   ProRegTX,
   ProUpRegTx,
   ProUpRevTx,
   ProUpServTx,
+  ProUpShareTx,
+  ProUpSharedRegTx,
   QcTx
 }
 

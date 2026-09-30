@@ -30,6 +30,9 @@ import { QcTx } from './ExtraPayload/QcTx.js'
 import { MnHfTx } from './ExtraPayload/MnHfTx.js'
 import { AssetLockTx } from './ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './ExtraPayload/AssetUnlockTx.js'
+import { ProDisTx } from './ExtraPayload/ProDisTx.js'
+import { ProUpShareTx } from './ExtraPayload/ProUpShareTx.js'
+import { ProUpSharedRegTx } from './ExtraPayload/ProUpSharedRegTx.js'
 
 export class Transaction {
   version: number
@@ -112,6 +115,12 @@ export class Transaction {
         return 'AssetLockTx'
       case TransactionType.TRANSACTION_ASSET_UNLOCK:
         return 'AssetUnlockTx'
+      case TransactionType.TRANSACTION_PROVIDER_DISSOLVE:
+        return 'ProDisTx'
+      case TransactionType.TRANSACTION_PROVIDER_UPDATE_SHARE:
+        return 'ProUpShareTx'
+      case TransactionType.TRANSACTION_PROVIDER_UPDATE_SHARED_REGISTRAR:
+        return 'ProUpSharedRegTx'
     }
 
     return undefined
@@ -407,6 +416,15 @@ export class Transaction {
           break
         case TransactionType.TRANSACTION_ASSET_UNLOCK:
           extraPayloadHandler = AssetUnlockTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_PROVIDER_DISSOLVE:
+          extraPayloadHandler = ProDisTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_PROVIDER_UPDATE_SHARE:
+          extraPayloadHandler = ProUpShareTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_PROVIDER_UPDATE_SHARED_REGISTRAR:
+          extraPayloadHandler = ProUpSharedRegTx.fromBytes
           break
         default:
           throw new Error(`Unsupported extra payload type ${type}`)

@@ -51,7 +51,10 @@ export enum TransactionType {
   TRANSACTION_QUORUM_COMMITMENT = 6,
   TRANSACTION_MASTERNODE_HARD_FORK_SIGNAL = 7,
   TRANSACTION_ASSET_LOCK = 8,
-  TRANSACTION_ASSET_UNLOCK = 9
+  TRANSACTION_ASSET_UNLOCK = 9,
+  TRANSACTION_PROVIDER_DISSOLVE = 10,
+  TRANSACTION_PROVIDER_UPDATE_SHARE = 11,
+  TRANSACTION_PROVIDER_UPDATE_SHARED_REGISTRAR = 12
 }
 
 export const TRANSACTION_VERSION = 3
@@ -403,5 +406,10 @@ export enum ExtraPayloadType {
   'QcTx' = 5,
   'MnHfTx' = 6,
   'AssetLockTx' = 7,
-  'AssetUnlockTx' = 8
+  'AssetUnlockTx' = 8,
+  'ProDisTx' = 9,
+  'ProUpShareTx' = 10,
+  'ProUpSharedRegTx' = 11
 }
+
+export const COMPACT_SIGNATURE_SIZE = 65
