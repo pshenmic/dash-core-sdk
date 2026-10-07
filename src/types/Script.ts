@@ -1,4 +1,4 @@
-import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES, OPCODES_ENUM } from '../constants.js'
+import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES, OPCODES_ENUM, SHARED_COLLATERAL_SCRIPT } from '../constants.js'
 import { bytesToHex, hexToBytes, networkValueToEnumValue, SHA256RIPEMD160 } from '../utils.js'
 import { NetworkLike, ScriptChunk } from '../types.js'
 import { Base58Check } from '../base58check.js'
@@ -252,5 +252,16 @@ export class Script {
     const bytes = this.bytes()
 
     return bytesToHex(bytes)
+  }
+
+  /**
+   * Whether this is the shared masternode collateral template script (exact match)
+   */
+  isSharedCollateral (): boolean {
+    return this.hex() === SHARED_COLLATERAL_SCRIPT
+  }
+
+  static sharedCollateral (): Script {
+    return Script.fromHex(SHARED_COLLATERAL_SCRIPT)
   }
 }

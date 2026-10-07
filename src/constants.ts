@@ -89,6 +89,20 @@ export const ASSET_UNLOCK_PAYLOAD_SIZE = 1 + 8 + 4 + ASSET_UNLOCK_QUORUM_INFO_SI
  */
 export const ASSET_UNLOCK_STABLE_TXID_VERSION = 2
 
+/**
+ * DIP-27 signing request id prefix, the request id SHA256d(prefix || index)
+ * identifies a withdrawal across every instance and version of its asset unlock
+ */
+export const ASSET_UNLOCK_REQUEST_ID_PREFIX = 'plwdtx'
+
+/**
+ * Shared masternode collateral template script: 0x04 "DSHC" OP_DROP OP_TRUE
+ *
+ * Anyone-can-spend at the script layer, consensus only allows it as the collateral
+ * output of a shared ProRegTx and only allows spending it via a ProDisTx
+ */
+export const SHARED_COLLATERAL_SCRIPT = '04445348437551'
+
 export const DEFAULT_NLOCK_TIME = 0
 
 /**
