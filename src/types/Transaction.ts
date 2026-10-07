@@ -38,6 +38,7 @@ import { ProDisTx } from './ExtraPayload/ProDisTx.js'
 import { ProUpShareTx } from './ExtraPayload/ProUpShareTx.js'
 import { ProUpSharedRegTx } from './ExtraPayload/ProUpSharedRegTx.js'
 import { OutPoint } from './OutPoint.js'
+import { RawExtraPayload } from './ExtraPayload/RawExtraPayload.js'
 
 export class Transaction {
   version: number
@@ -125,19 +126,20 @@ export class Transaction {
 
   /**
    * Whether this is an asset unlock carrying a well-formed payload
+   *
+   * Judged from the payload bytes, like Dash Core, so it holds for a raw payload too
    */
   isAssetUnlockPayload (): boolean {
     return this.version >= SPECIAL_TRANSACTION_VERSION &&
       this.type === TransactionType.TRANSACTION_ASSET_UNLOCK &&
-      this.extraPayload instanceof AssetUnlockTx &&
-      this.extraPayload.bytes().byteLength === ASSET_UNLOCK_PAYLOAD_SIZE
+      this.extraPayload?.bytes().byteLength === ASSET_UNLOCK_PAYLOAD_SIZE
   }
 
   /**
    * Whether the txid is computed with the quorum signing info zeroed (asset unlock payload version 2+)
    */
   isAssetUnlockWithStableTxid (): boolean {
-    return this.isAssetUnlockPayload() && (this.extraPayload as AssetUnlockTx).version >= ASSET_UNLOCK_STABLE_TXID_VERSION
+    return this.isAssetUnlockPayload() && (this.extraPayload as ExtraPayload).bytes()[0] >= ASSET_UNLOCK_STABLE_TXID_VERSION
   }
 
   /**
@@ -148,13 +150,24 @@ export class Transaction {
    */
   getLockInputs (): OutPoint[] {
     if (this.isAssetUnlockPayload()) {
-      return [(this.extraPayload as AssetUnlockTx).getLockOutPoint()]
+      const payload = this.extraPayload instanceof AssetUnlockTx
+        ? this.extraPayload
+        : AssetUnlockTx.fromBytes((this.extraPayload as ExtraPayload).bytes())
+
+      return [payload.getLockOutPoint()]
     }
 
     return this.inputs.map(input => new OutPoint(input.txId, input.vOut))
   }
 
+  /**
+   * Name of the decoded extra payload class, undefined when there is none or it is kept as RawExtraPayload
+   */
   getExtraPayloadType (): keyof typeof ExtraPayloadType | undefined {
+    if (this.extraPayload instanceof RawExtraPayload) {
+      return undefined
+    }
+
     switch (this.type) {
       case TransactionType.TRANSACTION_PROVIDER_REGISTER:
         return 'ProRegTx'
@@ -446,7 +459,7 @@ export class Transaction {
     if (type !== 0 && lockTimePadding + 4 < bytes.length) {
       const extraPayloadSize = decodeCompactSize(lockTimePadding + 4, bytes)
 
-      let extraPayloadHandler: Function
+      let extraPayloadHandler: (bytes: Uint8Array) => ExtraPayload
 
       switch (type) {
         case TransactionType.TRANSACTION_PROVIDER_REGISTER:
@@ -486,10 +499,17 @@ export class Transaction {
           extraPayloadHandler = ProUpSharedRegTx.fromBytes
           break
         default:
-          throw new Error(`Unsupported extra payload type ${type}`)
+          extraPayloadHandler = RawExtraPayload.fromBytes
       }
 
-      extraPayload = extraPayloadHandler(bytes.slice(lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize), lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize) + Number(extraPayloadSize)))
+      const extraPayloadBytes = bytes.slice(lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize), lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize) + Number(extraPayloadSize))
+
+      try {
+        extraPayload = extraPayloadHandler(extraPayloadBytes)
+      } catch {
+        // e.g. a payload version introduced by a later hard fork, keep the bytes so the transaction still round-trips
+        extraPayload = RawExtraPayload.fromBytes(extraPayloadBytes)
+      }
     }
 
     return new Transaction(inputs, outputs, nLockTime, version, type, extraPayload)

@@ -10,6 +10,7 @@ import { Input } from '../src/types/Input.js'
 import { Output } from '../src/types/Output.js'
 import { Script } from '../src/types/Script.js'
 import { SHARED_COLLATERAL_SCRIPT, TransactionType } from '../src/constants.js'
+import { RawExtraPayload } from '../src/types/ExtraPayload/RawExtraPayload.js'
 import { bytesToHex, doubleSHA256 } from '../src/utils.js'
 
 const p2pkh = '76a914' + '99'.repeat(20) + '88ac'
@@ -215,5 +216,40 @@ describe('Shared collateral script', () => {
     expect(Script.fromHex('04445348437551').isSharedCollateral()).toBe(true)
     expect(Script.fromHex('0444534843755151').isSharedCollateral()).toBe(false)
     expect(Script.fromHex('76a914' + '99'.repeat(20) + '88ac').isSharedCollateral()).toBe(false)
+  })
+})
+
+describe('Undecodable extra payloads', () => {
+  const withPayload = (type: number, payloadHex: string): string =>
+    new Transaction([new Input('cc'.repeat(32), 0, new Script(), 0xffffffff)], [new Output(1000n, new Script())], 0, 3, type, RawExtraPayload.fromHex(payloadHex)).hex()
+
+  test('should keep an unknown transaction type as raw bytes', () => {
+    const hex = withPayload(13, '0100deadbeef')
+
+    const tx = Transaction.fromHex(hex)
+
+    expect(tx.extraPayload).toBeInstanceOf(RawExtraPayload)
+    expect(tx.getExtraPayloadType()).toBeUndefined()
+    expect(tx.toJSON().extraPayload).toEqual({ raw: '0100deadbeef' })
+    expect(tx.hex()).toBe(hex)
+  })
+
+  test('should keep a payload its parser rejects as raw bytes', () => {
+    const hex = withPayload(TransactionType.TRANSACTION_PROVIDER_REGISTER, '0400' + '00'.repeat(10))
+
+    const tx = Transaction.fromHex(hex)
+
+    expect(tx.extraPayload).toBeInstanceOf(RawExtraPayload)
+    expect(tx.getExtraPayloadType()).toBeUndefined()
+    expect(tx.hex()).toBe(hex)
+  })
+
+  test('should apply the stable txid to a raw asset unlock payload', () => {
+    const payload = new AssetUnlockTx(2, 5n, 1000, 100, 'aa'.repeat(32), 'bb'.repeat(96))
+    const decoded = new Transaction([], [], 0, 3, TransactionType.TRANSACTION_ASSET_UNLOCK, payload)
+    const raw = new Transaction([], [], 0, 3, TransactionType.TRANSACTION_ASSET_UNLOCK, RawExtraPayload.fromBytes(payload.bytes()))
+
+    expect(raw.hash()).toBe(decoded.hash())
+    expect(raw.getLockInputs()).toEqual(decoded.getLockInputs())
   })
 })

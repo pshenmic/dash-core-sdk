@@ -11,6 +11,7 @@ import { AssetUnlockTx } from './types/ExtraPayload/AssetUnlockTx.js'
 import { ProDisTx } from './types/ExtraPayload/ProDisTx.js'
 import { ProUpShareTx } from './types/ExtraPayload/ProUpShareTx.js'
 import { ProUpSharedRegTx } from './types/ExtraPayload/ProUpSharedRegTx.js'
+import { RawExtraPayload } from './types/ExtraPayload/RawExtraPayload.js'
 
 export interface ScriptChunk {
   opcode: number
@@ -35,6 +36,7 @@ export type ExtraPayload =
   | ProDisTx
   | ProUpShareTx
   | ProUpSharedRegTx
+  | RawExtraPayload
 
 export interface TransactionJSON {
   version: number
@@ -57,6 +59,7 @@ export interface TransactionJSON {
   | ProDisTxJSON
   | ProUpShareTxJSON
   | ProUpSharedRegTxJSON
+  | RawExtraPayloadJSON
   | null
 }
 
@@ -205,6 +208,10 @@ export interface ProUpRevTxJSON {
   reason: number
   inputsHash: string
   payloadSig: string
+}
+
+export interface RawExtraPayloadJSON {
+  raw: string
 }
 
 export interface ProDisTxJSON {

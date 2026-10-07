@@ -34,6 +34,7 @@ import { MnHfTx } from './types/ExtraPayload/MnHfTx.js'
 import { ProDisTx } from './types/ExtraPayload/ProDisTx.js'
 import { ProUpShareTx } from './types/ExtraPayload/ProUpShareTx.js'
 import { ProUpSharedRegTx } from './types/ExtraPayload/ProUpSharedRegTx.js'
+import { RawExtraPayload } from './types/ExtraPayload/RawExtraPayload.js'
 import { ProRegTX } from './types/ExtraPayload/ProRegTX.js'
 import { ProUpRegTx } from './types/ExtraPayload/ProUpRegTx.js'
 import { ProUpRevTx } from './types/ExtraPayload/ProUpRevTx.js'
@@ -107,7 +108,8 @@ const extraPayload = {
   ProUpServTx,
   ProUpShareTx,
   ProUpSharedRegTx,
-  QcTx
+  QcTx,
+  RawExtraPayload
 }
 
 const messages = {
@@ -279,7 +281,14 @@ export class DashCoreSDK {
           break
         }
         case 'rawTransaction': {
-          const transaction = Transaction.fromBytes(hexToBytes(event.data))
+          let transaction: Transaction
+
+          try {
+            transaction = Transaction.fromBytes(hexToBytes(event.data))
+          } catch {
+            // bloom filters let through unrelated transactions, one that cannot be parsed must not end the wait
+            break
+          }
 
           const transactionMatchesPayment = transaction
             .outputs
@@ -305,7 +314,13 @@ export class DashCoreSDK {
           break
         }
         case 'instantSendLockMessage': {
-          const instantSendLock = InstantLock.fromHex(event.data)
+          let instantSendLock: InstantLock
+
+          try {
+            instantSendLock = InstantLock.fromHex(event.data)
+          } catch {
+            break
+          }
 
           if (pendingTransactions.has(instantSendLock.txId)) {
             return {
