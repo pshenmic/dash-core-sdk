@@ -1,5 +1,7 @@
-import { bytesToHex, hexToBytes } from '../../utils.js'
+import { bytesToHex, doubleSHA256, encodeCompactSize, hexToBytes } from '../../utils.js'
 import { AssetUnlockTxJSON } from '../../types.js'
+import { ASSET_UNLOCK_REQUEST_ID_PREFIX } from '../../constants.js'
+import { OutPoint } from '../OutPoint.js'
 
 export class AssetUnlockTx {
   version: number
@@ -16,6 +18,32 @@ export class AssetUnlockTx {
     this.requestedHeight = requestedHeight
     this.quorumHash = quorumHash
     this.quorumSig = quorumSig
+  }
+
+  /**
+   * DIP-27 signing request id of this withdrawal: SHA256d(ser_string("plwdtx") || index as LE uint64)
+   *
+   * Shared by every instance and version of one withdrawal
+   */
+  getRequestId (): string {
+    const prefixBytes = new TextEncoder().encode(ASSET_UNLOCK_REQUEST_ID_PREFIX)
+    const prefixSizeBytes = encodeCompactSize(prefixBytes.byteLength)
+
+    const data = new Uint8Array(prefixSizeBytes.byteLength + prefixBytes.byteLength + 8)
+
+    data.set(prefixSizeBytes, 0)
+    data.set(prefixBytes, prefixSizeBytes.byteLength)
+    new DataView(data.buffer).setBigUint64(prefixSizeBytes.byteLength + prefixBytes.byteLength, this.index, true)
+
+    return bytesToHex(doubleSHA256(data).toReversed())
+  }
+
+  /**
+   * Synthetic outpoint {request id, 0} that an InstantSend lock of this withdrawal pins,
+   * since asset unlocks have no inputs
+   */
+  getLockOutPoint (): OutPoint {
+    return new OutPoint(this.getRequestId(), 0)
   }
 
   static fromBytes (bytes: Uint8Array): AssetUnlockTx {

@@ -6,7 +6,10 @@ import { ProUpServTx } from '../src/types/ExtraPayload/ProUpServTx.js'
 import { ProUpRegTx } from '../src/types/ExtraPayload/ProUpRegTx.js'
 import { ExtNetInfo, NetInfoEntryType, NetInfoPurpose } from '../src/types/ExtNetInfo.js'
 import { Transaction } from '../src/types/Transaction.js'
-import { TransactionType } from '../src/constants.js'
+import { Input } from '../src/types/Input.js'
+import { Output } from '../src/types/Output.js'
+import { Script } from '../src/types/Script.js'
+import { SHARED_COLLATERAL_SCRIPT, TransactionType } from '../src/constants.js'
 import { bytesToHex, doubleSHA256 } from '../src/utils.js'
 
 const p2pkh = '76a914' + '99'.repeat(20) + '88ac'
@@ -166,5 +169,51 @@ describe('ProTx v3', () => {
     expect(() => ProRegTX.fromHex('0400')).toThrow('Unsupported version')
     expect(() => ProUpServTx.fromHex('0400')).toThrow('Unsupported version')
     expect(() => ProUpRegTx.fromHex('0400')).toThrow('Unsupported version')
+  })
+})
+
+describe('Asset unlock InstantSend lock inputs', () => {
+  const makeUnlock = (version: number, index: bigint, requestedHeight = 100): Transaction => new Transaction([], [], 0, 3, TransactionType.TRANSACTION_ASSET_UNLOCK,
+    new AssetUnlockTx(version, index, 1000, requestedHeight, 'aa'.repeat(32), 'bb'.repeat(96)))
+
+  test('should compute the DIP-27 request id', () => {
+    expect(new AssetUnlockTx(2, 0n, 0, 0, 'aa'.repeat(32), 'bb'.repeat(96)).getRequestId())
+      .toBe('922a8fc39b6e265ca761eaaf863387a5e2019f4795a42260805f5562699fd9fa')
+    expect(new AssetUnlockTx(2, 5n, 0, 0, 'aa'.repeat(32), 'bb'.repeat(96)).getRequestId())
+      .toBe('872092bf84f88754863fe5dd05b7d9d5228d04fcadc58b8682f29a556f9d8bba')
+    expect(new AssetUnlockTx(1, 1234567890123n, 0, 0, 'aa'.repeat(32), 'bb'.repeat(96)).getRequestId())
+      .toBe('c7ac65eb619d9136ae4dd462b2424676ec75e13fe3566e070352c0dd14658600')
+  })
+
+  test('should pin one synthetic outpoint per withdrawal index', () => {
+    const inputs = makeUnlock(2, 5n).getLockInputs()
+
+    expect(inputs.map(input => input.toJSON())).toEqual([{ txId: '872092bf84f88754863fe5dd05b7d9d5228d04fcadc58b8682f29a556f9d8bba', vOut: 0 }])
+    expect(makeUnlock(2, 5n, 148).getLockInputs()).toEqual(inputs)
+    expect(makeUnlock(1, 5n).getLockInputs()).toEqual(inputs)
+    expect(makeUnlock(2, 6n).getLockInputs()).not.toEqual(inputs)
+  })
+
+  test('should pin the spent outpoints of other transactions', () => {
+    const tx = new Transaction([new Input('cc'.repeat(32), 1, new Script(), 0xffffffff)], [new Output(1000n, new Script())])
+
+    expect(tx.getLockInputs().map(input => input.toJSON())).toEqual([{ txId: 'cc'.repeat(32), vOut: 1 }])
+  })
+
+  test('should report instanceHash only for version 2 unlocks', () => {
+    const v2 = makeUnlock(2, 5n)
+
+    expect(v2.toJSON().instanceHash).toBe(v2.instanceHash())
+    expect(makeUnlock(1, 5n).toJSON().instanceHash).toBeUndefined()
+  })
+})
+
+describe('Shared collateral script', () => {
+  test('should match the template exactly', () => {
+    expect(Script.sharedCollateral().hex()).toBe(SHARED_COLLATERAL_SCRIPT)
+    expect(Script.sharedCollateral().ASMString()).toBe('OP_PUSHBYTES_4 44534843 OP_DROP OP_TRUE')
+    expect(Script.fromHex('04445348437551').isSharedCollateral()).toBe(true)
+    expect(Script.fromHex('0444534843755151').isSharedCollateral()).toBe(false)
+    expect(Script.fromHex('76a914' + '99'.repeat(20) + '88ac').isSharedCollateral()).toBe(false)
   })
 })

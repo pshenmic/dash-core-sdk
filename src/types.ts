@@ -43,6 +43,8 @@ export interface TransactionJSON {
   inputs: InputJSON[]
   outputs: OutputJSON[]
   hash: string
+  // only for version 2+ asset unlocks, hash of the full serialization
+  instanceHash?: string
   extraPayload: ProRegTxJSON
   | ProUpRegTxJSON
   | ProUpRevTxJSON

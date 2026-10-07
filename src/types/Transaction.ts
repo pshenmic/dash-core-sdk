@@ -37,6 +37,7 @@ import { AssetUnlockTx } from './ExtraPayload/AssetUnlockTx.js'
 import { ProDisTx } from './ExtraPayload/ProDisTx.js'
 import { ProUpShareTx } from './ExtraPayload/ProUpShareTx.js'
 import { ProUpSharedRegTx } from './ExtraPayload/ProUpSharedRegTx.js'
+import { OutPoint } from './OutPoint.js'
 
 export class Transaction {
   version: number
@@ -122,14 +123,35 @@ export class Transaction {
     return bytesToHex(doubleSHA256(this.bytes()).toReversed())
   }
 
+  /**
+   * Whether this is an asset unlock carrying a well-formed payload
+   */
+  isAssetUnlockPayload (): boolean {
+    return this.version >= SPECIAL_TRANSACTION_VERSION &&
+      this.type === TransactionType.TRANSACTION_ASSET_UNLOCK &&
+      this.extraPayload instanceof AssetUnlockTx &&
+      this.extraPayload.bytes().byteLength === ASSET_UNLOCK_PAYLOAD_SIZE
+  }
+
+  /**
+   * Whether the txid is computed with the quorum signing info zeroed (asset unlock payload version 2+)
+   */
   isAssetUnlockWithStableTxid (): boolean {
-    if (this.version < SPECIAL_TRANSACTION_VERSION || this.type !== TransactionType.TRANSACTION_ASSET_UNLOCK || this.extraPayload == null) {
-      return false
+    return this.isAssetUnlockPayload() && (this.extraPayload as AssetUnlockTx).version >= ASSET_UNLOCK_STABLE_TXID_VERSION
+  }
+
+  /**
+   * Outpoints that an InstantSend lock of this transaction pins
+   *
+   * These are the spent outpoints, except for asset unlocks, which have no inputs
+   * and pin the synthetic outpoint {request id of the withdrawal index, 0} instead
+   */
+  getLockInputs (): OutPoint[] {
+    if (this.isAssetUnlockPayload()) {
+      return [(this.extraPayload as AssetUnlockTx).getLockOutPoint()]
     }
 
-    const payloadBytes = this.extraPayload.bytes()
-
-    return payloadBytes.byteLength === ASSET_UNLOCK_PAYLOAD_SIZE && payloadBytes[0] >= ASSET_UNLOCK_STABLE_TXID_VERSION
+    return this.inputs.map(input => new OutPoint(input.txId, input.vOut))
   }
 
   getExtraPayloadType (): keyof typeof ExtraPayloadType | undefined {
@@ -485,7 +507,8 @@ export class Transaction {
       outputs: this.outputs.map(output => output.toJSON()),
       inputs: this.inputs.map(input => input.toJSON()),
       extraPayload: this.extraPayload?.toJSON() ?? null,
-      hash: this.hash()
+      hash: this.hash(),
+      ...(this.isAssetUnlockWithStableTxid() ? { instanceHash: this.instanceHash() } : {})
     }
   }
 }
