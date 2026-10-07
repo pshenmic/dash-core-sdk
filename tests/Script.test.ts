@@ -54,6 +54,18 @@ describe('Script', () => {
     })
   })
 
+  describe('#getAddress', () => {
+    it('should encode P2PKH with the pubkey hash prefix', () => {
+      expect(Script.fromHex(P2PKH).getAddress('mainnet')).toStrictEqual('XqbY9a23LCRhE22uP3hgUtfn4HTdcQPmic')
+    })
+
+    it('should encode P2SH with the script hash prefix', () => {
+      expect(Script.fromHex(`a914${'11'.repeat(20)}87`).getAddress('mainnet')).toStrictEqual('7Txtgp4EGu7Ug2mro1RFj1qhymjtZGGYoM')
+      expect(Script.fromHex(`a914${'11'.repeat(20)}87`).getAddress('testnet')).toStrictEqual('8fyhe8x6QSW78LC7sGRDBPf4sHWihqH3iu')
+      expect(Script.fromHex('a914a3890b802865e1cfeed7653d0fea33831d709b6f87').getAddress('mainnet')).toStrictEqual('7hKM548kjNd8A1fhusiZPNLaJ212ybKLD2')
+    })
+  })
+
   describe('#fromBytes on a view into a larger buffer', () => {
     it('should read pushed data relative to the view, not the backing buffer', () => {
       const backing = hexToBytes(`ffffffff${P2PKH}`)

@@ -68,7 +68,8 @@ export class Script {
     const opcodeChunk = this.parsedScriptChunks[cryptoOpcodeIndex]
 
     let pubKeyHash: Uint8Array
-    const prefix: NetworkPrefix = (normalNetwork ?? DEFAULT_NETWORK) === Network.Testnet ? NetworkPrefix.PubkeyPrefixTestnet : NetworkPrefix.PubkeyPrefixMainnet
+    const isTestnet = (normalNetwork ?? DEFAULT_NETWORK) === Network.Testnet
+    let prefix: NetworkPrefix = isTestnet ? NetworkPrefix.PubkeyPrefixTestnet : NetworkPrefix.PubkeyPrefixMainnet
 
     if (opcodeChunk?.opcode === OPCODES.OP_HASH160) {
       if (opcodeChunk === undefined) {
@@ -82,6 +83,16 @@ export class Script {
       }
 
       pubKeyHash = new Uint8Array(hashChunk.data)
+
+      // P2SH: OP_HASH160 <20 bytes> OP_EQUAL
+      const isP2SH = cryptoOpcodeIndex === 0 &&
+        this.parsedScriptChunks.length === 3 &&
+        pubKeyHash.byteLength === 20 &&
+        this.parsedScriptChunks[2].opcode === OPCODES.OP_EQUAL
+
+      if (isP2SH) {
+        prefix = isTestnet ? NetworkPrefix.ScriptPrefixTestnet : NetworkPrefix.ScriptPrefixMainnet
+      }
     } else {
       if (opcodeChunk === undefined || opcodeChunk?.data === undefined) {
         return undefined
