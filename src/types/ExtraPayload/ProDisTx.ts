@@ -3,7 +3,7 @@ import {
   hexToBytes
 } from '../../utils.js'
 import { ProDisTxJSON } from '../../types.js'
-import {COMPACT_SIGNATURE_SIZE} from "../../constants.js";
+import { COMPACT_SIGNATURE_SIZE } from '../../constants.js'
 
 export class ProDisTx {
   version: number

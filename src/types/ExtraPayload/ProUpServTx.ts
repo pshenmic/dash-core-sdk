@@ -9,7 +9,8 @@ import {
   ipToBytes
 } from '../../utils.js'
 import { NetworkLike, ProUpServTxJSON } from '../../types.js'
-import { DEFAULT_NETWORK } from '../../constants.js'
+import { DEFAULT_NETWORK, PROTX_VERSION_EXT_ADDR } from '../../constants.js'
+import { ExtNetInfo, NetInfoPurpose } from '../ExtNetInfo.js'
 
 export class ProUpServTx {
   version: number
@@ -25,14 +26,17 @@ export class ProUpServTx {
   scriptOperatorPayout: Script
   inputsHash: string
 
-  // only if version == 2
+  // only if type == 1, ports only if version < 3
   platformNodeID?: string
   platformP2PPort?: number
   platformHTTPPort?: number
 
   payloadSig: string
 
-  constructor (version: number, type: number, proTxHash: string, ipAddress: string, port: number, /* netInfo: Uint8Array, */ scriptOperatorPayout: Script, inputsHash: string, platformNodeID: string | undefined, platformP2PPort: number | undefined, platformHTTPPort: number | undefined, payloadSig: string) {
+  // only if version >= 3, ipAddress and port then mirror the primary core p2p entry
+  netInfo?: ExtNetInfo
+
+  constructor (version: number, type: number, proTxHash: string, ipAddress: string, port: number, /* netInfo: Uint8Array, */ scriptOperatorPayout: Script, inputsHash: string, platformNodeID: string | undefined, platformP2PPort: number | undefined, platformHTTPPort: number | undefined, payloadSig: string, netInfo?: ExtNetInfo) {
     this.version = version
     this.type = type
 
@@ -50,6 +54,8 @@ export class ProUpServTx {
     this.platformHTTPPort = platformHTTPPort
 
     this.payloadSig = payloadSig
+
+    this.netInfo = netInfo
   }
 
   getOperatorPayoutAddress (network: NetworkLike = DEFAULT_NETWORK): string | undefined {
@@ -61,7 +67,7 @@ export class ProUpServTx {
 
     const version = dataView.getUint16(0, true)
 
-    if (version >= 3) {
+    if (version === 0 || version > PROTX_VERSION_EXT_ADDR) {
       throw new Error(`Unsupported version of ProUpServTX: ${version}`)
     }
 
@@ -77,11 +83,24 @@ export class ProUpServTx {
     const proTxHash = bytes.slice(cursor, cursor + 32)
     cursor += 32
 
-    const ipAddress = bytes.slice(cursor, cursor + 16)
-    cursor += 16
+    let ipAddress: string
+    let port: number
+    let netInfo: ExtNetInfo | undefined
 
-    const port = dataView.getUint16(cursor, false)
-    cursor += 2
+    if (version >= PROTX_VERSION_EXT_ADDR) {
+      netInfo = ExtNetInfo.fromBytes(bytes.slice(cursor))
+      cursor += netInfo.bytes().byteLength
+
+      const primary = netInfo.getPrimaryEntry(NetInfoPurpose.CORE_P2P)
+      ipAddress = primary?.address ?? ''
+      port = primary?.port ?? 0
+    } else {
+      ipAddress = bytesToIp(bytes.slice(cursor, cursor + 16))
+      cursor += 16
+
+      port = dataView.getUint16(cursor, false)
+      cursor += 2
+    }
 
     const scriptPayoutSize = decodeCompactSize(cursor, bytes)
     cursor += getCompactVariableSize(scriptPayoutSize)
@@ -96,13 +115,17 @@ export class ProUpServTx {
     let platformHTTPPort: number | undefined
 
     // Per Dash Core, platform fields exist iff nType == MnType::Evo (1).
+    // Since version 3 platform ports are stored in netInfo.
     if (type === 1) {
       platformNodeID = bytes.slice(cursor, cursor + 20)
       cursor += 20
-      platformP2PPort = dataView.getUint16(cursor, true)
-      cursor += 2
-      platformHTTPPort = dataView.getUint16(cursor, true)
-      cursor += 2
+
+      if (version < PROTX_VERSION_EXT_ADDR) {
+        platformP2PPort = dataView.getUint16(cursor, true)
+        cursor += 2
+        platformHTTPPort = dataView.getUint16(cursor, true)
+        cursor += 2
+      }
     }
 
     const payloadSig = bytes.slice(cursor, cursor + 96)
@@ -111,14 +134,15 @@ export class ProUpServTx {
       version,
       type,
       bytesToHex(proTxHash.toReversed()),
-      bytesToIp(ipAddress),
+      ipAddress,
       port,
       scriptOperatorPayout,
       bytesToHex(inputsHash.toReversed()),
       platformNodeID !== undefined ? bytesToHex(platformNodeID.toReversed()) : undefined,
       platformP2PPort,
       platformHTTPPort,
-      bytesToHex(payloadSig)
+      bytesToHex(payloadSig),
+      netInfo
     )
   }
 
@@ -139,10 +163,19 @@ export class ProUpServTx {
 
     const proTxHashBytes = new Uint8Array(hexToBytes(this.proTxHash).toReversed())
 
-    const ipAddressBytes = ipToBytes(this.ipAddress)
+    const isExtended = this.version >= PROTX_VERSION_EXT_ADDR
 
-    const portBytes = new Uint8Array(2)
-    new DataView(portBytes.buffer, portBytes.byteOffset, portBytes.byteLength).setUint16(0, this.port, false)
+    let ipAddressBytes: Uint8Array<ArrayBufferLike>
+    let portBytes = new Uint8Array(0)
+
+    if (isExtended) {
+      ipAddressBytes = (this.netInfo ?? new ExtNetInfo()).bytes()
+    } else {
+      ipAddressBytes = ipToBytes(this.ipAddress)
+
+      portBytes = new Uint8Array(2)
+      new DataView(portBytes.buffer, portBytes.byteOffset, portBytes.byteLength).setUint16(0, this.port, false)
+    }
 
     const scriptOperatorPayoutBytes = this.scriptOperatorPayout.bytes()
     const scriptOperatorPayoutSizeBytes = encodeCompactSize(scriptOperatorPayoutBytes.byteLength)
@@ -156,11 +189,14 @@ export class ProUpServTx {
     // Per Dash Core, platform fields exist iff nType == MnType::Evo (1).
     if (this.type === 1) {
       platformNodeIDBytes = hexToBytes(this.platformNodeID ?? '').toReversed()
-      platformP2PPortBytes = new Uint8Array(2)
-      platformHTTPPortBytes = new Uint8Array(2)
 
-      new DataView(platformP2PPortBytes.buffer, platformP2PPortBytes.byteOffset, platformP2PPortBytes.byteLength).setUint16(0, this.platformP2PPort ?? 0, true)
-      new DataView(platformHTTPPortBytes.buffer, platformHTTPPortBytes.byteOffset, platformHTTPPortBytes.byteLength).setUint16(0, this.platformHTTPPort ?? 0, true)
+      if (!isExtended) {
+        platformP2PPortBytes = new Uint8Array(2)
+        platformHTTPPortBytes = new Uint8Array(2)
+
+        new DataView(platformP2PPortBytes.buffer, platformP2PPortBytes.byteOffset, platformP2PPortBytes.byteLength).setUint16(0, this.platformP2PPort ?? 0, true)
+        new DataView(platformHTTPPortBytes.buffer, platformHTTPPortBytes.byteOffset, platformHTTPPortBytes.byteLength).setUint16(0, this.platformHTTPPort ?? 0, true)
+      }
     }
 
     const payloadSigBytes = hexToBytes(this.payloadSig)
@@ -210,7 +246,8 @@ export class ProUpServTx {
       ipAddress: this.ipAddress,
       port: this.port,
       type: this.type,
-      version: this.version
+      version: this.version,
+      ...(this.netInfo != null ? { netInfo: this.netInfo.toJSON() } : {})
     }
   }
 }

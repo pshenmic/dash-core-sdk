@@ -59,6 +59,36 @@ export enum TransactionType {
 
 export const TRANSACTION_VERSION = 3
 
+/**
+ * ProTx payload version that replaced the legacy address with ExtNetInfo
+ * and the payout script with a list of payout shares
+ */
+export const PROTX_VERSION_EXT_ADDR = 3
+
+/**
+ * Minimal transaction version that carries type and extra payload
+ */
+export const SPECIAL_TRANSACTION_VERSION = 3
+
+/**
+ * 4 - requestedHeight
+ * 32 - quorumHash
+ * 96 - quorumSig
+ */
+export const ASSET_UNLOCK_QUORUM_INFO_SIZE = 4 + 32 + 96
+
+/**
+ * 1 - version
+ * 8 - index
+ * 4 - fee
+ */
+export const ASSET_UNLOCK_PAYLOAD_SIZE = 1 + 8 + 4 + ASSET_UNLOCK_QUORUM_INFO_SIZE
+
+/**
+ * Since this asset unlock payload version the txid is computed with the quorum info zeroed
+ */
+export const ASSET_UNLOCK_STABLE_TXID_VERSION = 2
+
 export const DEFAULT_NLOCK_TIME = 0
 
 /**

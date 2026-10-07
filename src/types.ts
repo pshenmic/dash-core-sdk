@@ -133,6 +133,13 @@ export interface ProRegTxJSON {
   platformP2PPort?: number
   platformHTTPPort?: number
   payloadSig?: string
+  // only for version >= 3
+  netInfo?: ExtNetInfoJSON
+  payouts?: PayoutShareJSON[]
+  shares?: CollateralShareJSON[]
+  joinSigs?: string[]
+  earlyPeriodBlocks?: number
+  earlyPenalty?: string
 }
 
 export interface ProUpServTxJSON {
@@ -147,6 +154,8 @@ export interface ProUpServTxJSON {
   platformNodeID?: string
   platformP2PPort?: number
   platformHTTPPort?: number
+  // only for version >= 3
+  netInfo?: ExtNetInfoJSON
 
   payloadSig: string
 }
@@ -160,6 +169,32 @@ export interface ProUpRegTxJSON {
   scriptPayout: string
   inputsHash: string
   payloadSig: string
+  // only for version >= 3
+  payouts?: PayoutShareJSON[]
+}
+
+export interface NetInfoEntryJSON {
+  type: number
+  network: number | null
+  address: string | null
+  port: number | null
+}
+
+export interface ExtNetInfoJSON {
+  version: number
+  entries: Record<string, NetInfoEntryJSON[]>
+}
+
+export interface PayoutShareJSON {
+  scriptPayout: string
+  reward: number
+}
+
+export interface CollateralShareJSON {
+  amount: string
+  scriptRefund: string
+  scriptReward: string
+  keyIdOwner: string
 }
 
 export interface ProUpRevTxJSON {
@@ -203,6 +238,7 @@ export interface CbTxJSON {
   bestCLHeightDiff: string | null
   bestCLSignature: string | null
   creditPoolBalance: string | null
+  merkleRootAssetUnlocks: string | null
 }
 
 export interface QcTxJSON {

@@ -4,7 +4,7 @@ import {
   hexToBytes
 } from '../../utils.js'
 import { NetworkLike, ProUpSharedRegTxJSON } from '../../types.js'
-import {COMPACT_SIGNATURE_SIZE, DEFAULT_NETWORK} from '../../constants.js'
+import { COMPACT_SIGNATURE_SIZE, DEFAULT_NETWORK } from '../../constants.js'
 
 export class ProUpSharedRegTx {
   version: number

@@ -1,8 +1,12 @@
 import {
+  ASSET_UNLOCK_PAYLOAD_SIZE,
+  ASSET_UNLOCK_QUORUM_INFO_SIZE,
+  ASSET_UNLOCK_STABLE_TXID_VERSION,
   CHANGE_OUTPUT_MAX_SIZE,
   DEFAULT_NLOCK_TIME,
   ExtraPayloadType, FEE_PER_BYTE, MIN_FEE_RELAY,
   NLOCK_TIME_BLOCK_BASED_LIMIT, OPCODES_ENUM, SIGHASH_ALL, SIGNED_INPUT_MAX_SIZE,
+  SPECIAL_TRANSACTION_VERSION,
   TRANSACTION_VERSION,
   TransactionType
 } from '../constants.js'
@@ -91,8 +95,41 @@ export class Transaction {
     }, BigInt(0))
   }
 
+  /**
+   * Transaction id
+   *
+   * For asset unlocks with payload version 2+ the quorum signing info (requestedHeight, quorumHash, quorumSig)
+   * is excluded from the hash, so every re-signed instance of one withdrawal shares one txid.
+   * The payload is serialized last, so that info occupies the trailing bytes of the transaction.
+   */
   hash (): string {
+    const bytes = this.bytes()
+
+    if (this.isAssetUnlockWithStableTxid()) {
+      bytes.fill(0, bytes.byteLength - ASSET_UNLOCK_QUORUM_INFO_SIZE)
+    }
+
+    return bytesToHex(doubleSHA256(bytes).toReversed())
+  }
+
+  /**
+   * Hash of the full serialization
+   *
+   * Equal to hash() for every transaction except version 2+ asset unlocks,
+   * where it distinguishes re-signed instances of one withdrawal
+   */
+  instanceHash (): string {
     return bytesToHex(doubleSHA256(this.bytes()).toReversed())
+  }
+
+  isAssetUnlockWithStableTxid (): boolean {
+    if (this.version < SPECIAL_TRANSACTION_VERSION || this.type !== TransactionType.TRANSACTION_ASSET_UNLOCK || this.extraPayload == null) {
+      return false
+    }
+
+    const payloadBytes = this.extraPayload.bytes()
+
+    return payloadBytes.byteLength === ASSET_UNLOCK_PAYLOAD_SIZE && payloadBytes[0] >= ASSET_UNLOCK_STABLE_TXID_VERSION
   }
 
   getExtraPayloadType (): keyof typeof ExtraPayloadType | undefined {
