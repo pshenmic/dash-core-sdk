@@ -1,8 +1,6 @@
 import { jest } from '@jest/globals'
 import { GetBlockchainStatusResponse_Status } from '../proto/generated/core.js'
 
-const TESTNET_SEED = 'https://158.160.14.115:1443'
-
 const getEvonodeList = jest.fn<(dapiUrls: string[]) => Promise<string[]>>()
 const getBlockchainStatus = jest.fn<() => Promise<{ response: { status: number } }>>()
 
@@ -15,6 +13,48 @@ jest.unstable_mockModule('../src/createCoreClient.js', () => ({
 }))
 
 const { default: GRPCConnectionPool } = await import('../src/grpcConnectionPool.js')
+const { DashCoreSDK } = await import('../src/DashCoreSDK.js')
+
+export const seedNodes = {
+  testnet: [
+    // seed-1.pshenmic.dev
+    'https://158.160.14.115:1443',
+    'https://62.84.119.150:1443',
+    // validator
+    'https://68.67.122.26:1443'
+  ],
+  mainnet: [
+    // seed-1.pshenmic.dev
+    'https://158.160.14.115:443',
+    'https://62.84.119.150:443',
+    // validator
+    'https://95.216.146.18:443'
+    // mainnet dcg seeds
+    // 'https://158.160.14.115',
+    // 'https://3.0.60.103',
+    // 'https://34.211.174.194'
+  ]
+}
+
+/**
+ * Answer the evonode lookup per seed node, a seed node missing from the map is down
+ */
+const lookupBySeed = (answers: Record<string, string[]>) => async ([seed]: string[]): Promise<string[]> => {
+  if (answers[seed] == null) {
+    throw new Error(`${seed} is down`)
+  }
+
+  return answers[seed]
+}
+
+const TESTNET_SEEDS = seedNodes.testnet
+const [TESTNET_SEED, TESTNET_SEED_B] = TESTNET_SEEDS
+
+/**
+ * Every seed node answers, the first one with the given evonodes, the others with an empty list
+ */
+const lookupFromFirstSeed = (evonodes: string[]): ReturnType<typeof lookupBySeed> =>
+  lookupBySeed(Object.fromEntries(TESTNET_SEEDS.map((seed, index) => [seed, index === 0 ? evonodes : []])))
 
 describe('GRPCConnectionPool', () => {
   let consoleError: jest.SpiedFunction<typeof console.error>
@@ -31,20 +71,44 @@ describe('GRPCConnectionPool', () => {
   })
 
   it('should recover from a failed evonode lookup on the next getClient', async () => {
-    getEvonodeList.mockRejectedValueOnce(new Error('Platform Explorer is down'))
+    getEvonodeList.mockImplementation(lookupBySeed({}))
 
     const pool = new GRPCConnectionPool('testnet', { poolLimit: 5 })
     await pool.ready()
 
-    expect(pool.dapiUrls).toEqual([TESTNET_SEED])
-
-    getEvonodeList.mockResolvedValueOnce(['https://10.0.0.1:1443', 'https://10.0.0.2:1443'])
+    getEvonodeList.mockImplementation(lookupFromFirstSeed(['https://10.0.0.1:1443', 'https://10.0.0.2:1443']))
 
     pool.getClient()
     await pool._refresh
 
-    expect(pool.dapiUrls.length).toBeGreaterThan(1)
-    expect(pool.dapiUrls).toEqual([TESTNET_SEED, 'https://10.0.0.1:1443', 'https://10.0.0.2:1443'])
+    expect(pool.dapiUrls).toEqual(expect.arrayContaining(['https://10.0.0.1:1443', 'https://10.0.0.2:1443']))
+  })
+
+  it('should drop a dead seed node', async () => {
+    getEvonodeList.mockImplementation(lookupBySeed({ [TESTNET_SEED]: ['https://10.0.0.1:1443'] }))
+
+    const pool = new GRPCConnectionPool('testnet', { poolLimit: 5 })
+    await pool.ready()
+
+    expect(pool.dapiUrls).toEqual([TESTNET_SEED, 'https://10.0.0.1:1443'])
+  })
+
+  it('should discover through the next seed node when the first one is dead', async () => {
+    getEvonodeList.mockImplementation(lookupBySeed({ [TESTNET_SEED_B]: ['https://10.0.0.1:1443'] }))
+
+    const pool = new GRPCConnectionPool('testnet', { poolLimit: 5 })
+    await pool.ready()
+
+    expect(pool.dapiUrls).toEqual([TESTNET_SEED_B, 'https://10.0.0.1:1443'])
+  })
+
+  it('should resolve sdk waitForInit once dead seed nodes are dropped', async () => {
+    getEvonodeList.mockImplementation(lookupBySeed({ [TESTNET_SEED]: ['https://10.0.0.1:1443'] }))
+
+    const sdk = new DashCoreSDK({ network: 'testnet' })
+    await sdk.waitForInit()
+
+    expect(sdk.grpcConnectionPool.dapiUrls).toEqual([TESTNET_SEED, 'https://10.0.0.1:1443'])
   })
 
   it('should not overwrite an explicitly configured dapiUrl', async () => {
@@ -75,7 +139,7 @@ describe('GRPCConnectionPool', () => {
   })
 
   it('should issue a single lookup for a burst of getClient calls', async () => {
-    getEvonodeList.mockRejectedValueOnce(new Error('Platform Explorer is down'))
+    getEvonodeList.mockImplementation(lookupBySeed({}))
 
     const pool = new GRPCConnectionPool('testnet', { poolLimit: 5 })
     await pool.ready()
@@ -88,29 +152,29 @@ describe('GRPCConnectionPool', () => {
       pool.getClient()
     }
 
-    expect(getEvonodeList).toHaveBeenCalledTimes(1)
+    expect(getEvonodeList).toHaveBeenCalledTimes(TESTNET_SEEDS.length)
   })
 
   it('should not refresh a pool that already holds evonodes', async () => {
-    getEvonodeList.mockResolvedValueOnce(['https://10.0.0.1:1443'])
+    getEvonodeList.mockImplementation(lookupFromFirstSeed(['https://10.0.0.1:1443']))
 
     const pool = new GRPCConnectionPool('testnet', { poolLimit: 5 })
     await pool.ready()
 
-    expect(pool.dapiUrls).toEqual([TESTNET_SEED, 'https://10.0.0.1:1443'])
+    expect(pool.dapiUrls).toEqual([...TESTNET_SEEDS, 'https://10.0.0.1:1443'])
 
     pool.getClient()
 
-    expect(getEvonodeList).toHaveBeenCalledTimes(1)
+    expect(getEvonodeList).toHaveBeenCalledTimes(TESTNET_SEEDS.length)
   })
 
-  it('should query the masternode list through the nodes already known', async () => {
-    getEvonodeList.mockResolvedValueOnce([])
+  it('should query the masternode list through every seed node', async () => {
+    getEvonodeList.mockImplementation(lookupFromFirstSeed([]))
 
     const pool = new GRPCConnectionPool('testnet', { poolLimit: 5 })
     await pool.ready()
 
-    expect(getEvonodeList).toHaveBeenCalledWith([TESTNET_SEED])
+    expect(getEvonodeList.mock.calls).toEqual(TESTNET_SEEDS.map((seed) => [[seed]]))
   })
 
   describe('healthcheck status', () => {
@@ -121,43 +185,43 @@ describe('GRPCConnectionPool', () => {
     ] as const
 
     it('should admit a node reporting READY', async () => {
-      getEvonodeList.mockResolvedValueOnce(['https://10.0.0.1:1443'])
+      getEvonodeList.mockImplementation(lookupFromFirstSeed(['https://10.0.0.1:1443']))
       getBlockchainStatus.mockResolvedValue({ response: { status: GetBlockchainStatusResponse_Status.READY } })
 
       const pool = new GRPCConnectionPool('testnet', { poolLimit: 5 })
       await pool.ready()
 
-      expect(pool.dapiUrls).toEqual([TESTNET_SEED, 'https://10.0.0.1:1443'])
+      expect(pool.dapiUrls).toEqual([...TESTNET_SEEDS, 'https://10.0.0.1:1443'])
     })
 
     it.each(rejected)('should keep out a node reporting %s', async (_name, status) => {
-      getEvonodeList.mockResolvedValueOnce(['https://10.0.0.1:1443'])
+      getEvonodeList.mockImplementation(lookupFromFirstSeed(['https://10.0.0.1:1443']))
       getBlockchainStatus.mockResolvedValue({ response: { status } })
 
       const pool = new GRPCConnectionPool('testnet', { poolLimit: 5 })
       await pool.ready()
 
-      expect(pool.dapiUrls).toEqual([TESTNET_SEED])
+      expect(pool.dapiUrls).toEqual(TESTNET_SEEDS)
     })
 
     it('should keep out a node whose healthcheck throws', async () => {
-      getEvonodeList.mockResolvedValueOnce(['https://10.0.0.1:1443'])
+      getEvonodeList.mockImplementation(lookupFromFirstSeed(['https://10.0.0.1:1443']))
       getBlockchainStatus.mockRejectedValue(new Error('connection refused'))
 
       const pool = new GRPCConnectionPool('testnet', { poolLimit: 5 })
       await pool.ready()
 
-      expect(pool.dapiUrls).toEqual([TESTNET_SEED])
+      expect(pool.dapiUrls).toEqual(TESTNET_SEEDS)
     })
 
     it('should stop healthchecking once the pool limit is reached', async () => {
-      getEvonodeList.mockResolvedValueOnce(['https://10.0.0.1:1443', 'https://10.0.0.2:1443', 'https://10.0.0.3:1443'])
+      getEvonodeList.mockImplementation(lookupFromFirstSeed(['https://10.0.0.1:1443', 'https://10.0.0.2:1443', 'https://10.0.0.3:1443']))
       getBlockchainStatus.mockResolvedValue({ response: { status: GetBlockchainStatusResponse_Status.READY } })
 
-      const pool = new GRPCConnectionPool('testnet', { poolLimit: 2 })
+      const pool = new GRPCConnectionPool('testnet', { poolLimit: TESTNET_SEEDS.length + 1 })
       await pool.ready()
 
-      expect(pool.dapiUrls).toEqual([TESTNET_SEED, 'https://10.0.0.1:1443'])
+      expect(pool.dapiUrls).toEqual([...TESTNET_SEEDS, 'https://10.0.0.1:1443'])
       expect(getBlockchainStatus).toHaveBeenCalledTimes(1)
     })
   })
