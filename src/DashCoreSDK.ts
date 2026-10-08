@@ -121,6 +121,13 @@ export class DashCoreSDK {
     })
   }
 
+  /**
+   * Resolves when the connection pool initialization (seed nodes check and evonodes discovery) is finished
+   */
+  async waitForInit (): Promise<void> {
+    await this.grpcConnectionPool.ready()
+  }
+
   private getNetworkType (): Network {
     return this.network === 'mainnet' ? Network.Mainnet : Network.Testnet
   }
