@@ -8,6 +8,10 @@ import { QcTx } from './types/ExtraPayload/QcTx.js'
 import { MnHfTx } from './types/ExtraPayload/MnHfTx.js'
 import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './types/ExtraPayload/AssetUnlockTx.js'
+import { ProDisTx } from './types/ExtraPayload/ProDisTx.js'
+import { ProUpShareTx } from './types/ExtraPayload/ProUpShareTx.js'
+import { ProUpSharedRegTx } from './types/ExtraPayload/ProUpSharedRegTx.js'
+import { RawExtraPayload } from './types/ExtraPayload/RawExtraPayload.js'
 
 export interface ScriptChunk {
   opcode: number
@@ -29,6 +33,10 @@ export type ExtraPayload =
   | MnHfTx
   | AssetLockTx
   | AssetUnlockTx
+  | ProDisTx
+  | ProUpShareTx
+  | ProUpSharedRegTx
+  | RawExtraPayload
 
 export interface TransactionJSON {
   version: number
@@ -37,6 +45,8 @@ export interface TransactionJSON {
   inputs: InputJSON[]
   outputs: OutputJSON[]
   hash: string
+  // only for version 2+ asset unlocks, hash of the full serialization
+  instanceHash?: string
   extraPayload: ProRegTxJSON
   | ProUpRegTxJSON
   | ProUpRevTxJSON
@@ -46,6 +56,10 @@ export interface TransactionJSON {
   | MnHfTxJSON
   | AssetLockTxJSON
   | AssetUnlockTxJSON
+  | ProDisTxJSON
+  | ProUpShareTxJSON
+  | ProUpSharedRegTxJSON
+  | RawExtraPayloadJSON
   | null
 }
 
@@ -124,6 +138,13 @@ export interface ProRegTxJSON {
   platformP2PPort?: number
   platformHTTPPort?: number
   payloadSig?: string
+  // only for version >= 3
+  netInfo?: ExtNetInfoJSON
+  payouts?: PayoutShareJSON[]
+  shares?: CollateralShareJSON[]
+  joinSigs?: string[]
+  earlyPeriodBlocks?: number
+  earlyPenalty?: string
 }
 
 export interface ProUpServTxJSON {
@@ -138,6 +159,8 @@ export interface ProUpServTxJSON {
   platformNodeID?: string
   platformP2PPort?: number
   platformHTTPPort?: number
+  // only for version >= 3
+  netInfo?: ExtNetInfoJSON
 
   payloadSig: string
 }
@@ -151,6 +174,32 @@ export interface ProUpRegTxJSON {
   scriptPayout: string
   inputsHash: string
   payloadSig: string
+  // only for version >= 3
+  payouts?: PayoutShareJSON[]
+}
+
+export interface NetInfoEntryJSON {
+  type: number
+  network: number | null
+  address: string | null
+  port: number | null
+}
+
+export interface ExtNetInfoJSON {
+  version: number
+  entries: Record<string, NetInfoEntryJSON[]>
+}
+
+export interface PayoutShareJSON {
+  scriptPayout: string
+  reward: number
+}
+
+export interface CollateralShareJSON {
+  amount: string
+  scriptRefund: string
+  scriptReward: string
+  keyIdOwner: string
 }
 
 export interface ProUpRevTxJSON {
@@ -161,6 +210,35 @@ export interface ProUpRevTxJSON {
   payloadSig: string
 }
 
+export interface RawExtraPayloadJSON {
+  raw: string
+}
+
+export interface ProDisTxJSON {
+  version: number
+  proTxHash: string
+  actorIndex: number
+  sigs: string[]
+}
+
+export interface ProUpShareTxJSON {
+  version: number
+  proTxHash: string
+  shareIndex: number
+  scriptReward: string
+  inputsHash: string
+  payloadSig: string
+}
+
+export interface ProUpSharedRegTxJSON {
+  version: number
+  proTxHash: string
+  pubKeyOperator: string
+  keyIdVoting: string
+  inputsHash: string
+  sigs: string[]
+}
+
 export interface CbTxJSON {
   version: number
   height: number
@@ -169,6 +247,7 @@ export interface CbTxJSON {
   bestCLHeightDiff: string | null
   bestCLSignature: string | null
   creditPoolBalance: string | null
+  merkleRootAssetUnlocks: string | null
 }
 
 export interface QcTxJSON {

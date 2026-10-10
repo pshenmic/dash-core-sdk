@@ -1,4 +1,4 @@
-import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES, OPCODES_ENUM } from '../constants.js'
+import { DEFAULT_NETWORK, Network, NetworkPrefix, OPCODES, OPCODES_ENUM, SHARED_COLLATERAL_SCRIPT } from '../constants.js'
 import { bytesToHex, hexToBytes, networkValueToEnumValue, SHA256RIPEMD160 } from '../utils.js'
 import { NetworkLike, ScriptChunk } from '../types.js'
 import { Base58Check } from '../base58check.js'
@@ -68,7 +68,8 @@ export class Script {
     const opcodeChunk = this.parsedScriptChunks[cryptoOpcodeIndex]
 
     let pubKeyHash: Uint8Array
-    const prefix: NetworkPrefix = (normalNetwork ?? DEFAULT_NETWORK) === Network.Testnet ? NetworkPrefix.PubkeyPrefixTestnet : NetworkPrefix.PubkeyPrefixMainnet
+    const isTestnet = (normalNetwork ?? DEFAULT_NETWORK) === Network.Testnet
+    let prefix: NetworkPrefix = isTestnet ? NetworkPrefix.PubkeyPrefixTestnet : NetworkPrefix.PubkeyPrefixMainnet
 
     if (opcodeChunk?.opcode === OPCODES.OP_HASH160) {
       if (opcodeChunk === undefined) {
@@ -82,6 +83,16 @@ export class Script {
       }
 
       pubKeyHash = new Uint8Array(hashChunk.data)
+
+      // P2SH: OP_HASH160 <20 bytes> OP_EQUAL
+      const isP2SH = cryptoOpcodeIndex === 0 &&
+        this.parsedScriptChunks.length === 3 &&
+        pubKeyHash.byteLength === 20 &&
+        this.parsedScriptChunks[2].opcode === OPCODES.OP_EQUAL
+
+      if (isP2SH) {
+        prefix = isTestnet ? NetworkPrefix.ScriptPrefixTestnet : NetworkPrefix.ScriptPrefixMainnet
+      }
     } else {
       if (opcodeChunk === undefined || opcodeChunk?.data === undefined) {
         return undefined
@@ -252,5 +263,16 @@ export class Script {
     const bytes = this.bytes()
 
     return bytesToHex(bytes)
+  }
+
+  /**
+   * Whether this is the shared masternode collateral template script (exact match)
+   */
+  isSharedCollateral (): boolean {
+    return this.hex() === SHARED_COLLATERAL_SCRIPT
+  }
+
+  static sharedCollateral (): Script {
+    return Script.fromHex(SHARED_COLLATERAL_SCRIPT)
   }
 }
