@@ -33,11 +33,17 @@ export interface MasternodeInfo {
 const seedNodes = {
   testnet: [
     // seed-1.pshenmic.dev
-    'https://158.160.14.115:1443'
+    'https://158.160.14.115:1443',
+    'https://62.84.119.150:1443',
+    // validator
+    'https://68.67.122.26:1443'
   ],
   mainnet: [
     // seed-1.pshenmic.dev
-    'https://158.160.14.115:443'
+    'https://158.160.14.115:443',
+    'https://62.84.119.150:443',
+    // validator
+    'https://95.216.146.18:443',
     // mainnet dcg seeds
     // 'https://158.160.14.115',
     // 'https://3.0.60.103',
@@ -104,22 +110,27 @@ export default class GRPCConnectionPool {
   /**
    * Rebuild the pool from the current evonode list.
    *
-   * The new list is assembled in a local array and swapped in at the end so a
-   * concurrent getClient never observes a half filled pool.
-   *
    * @param network - target Dash network
    * @param poolLimit - maximum number of nodes to keep
    */
   async _discover (network: 'testnet' | 'mainnet', poolLimit: number): Promise<void> {
-    // Query through the nodes already known, so discovery never depends on a
-    // third-party index being reachable
-    const evonodeUrls = await getEvonodeList([...this.dapiUrls])
+    // retrieve evonodes through the first responding seed node,
+    // seed nodes that failed to respond are removed from the pool
+    const seedRequests = seedNodes[network].map(async seed => {
+      try {
+        return await getEvonodeList([seed])
+      } catch (e) {
+        this.dapiUrls = this.dapiUrls.filter(url => url !== seed)
 
-    const dapiUrls = [...seedNodes[network]]
+        throw e
+      }
+    })
+
+    const evonodeUrls = await Promise.any(seedRequests)
 
     // healthcheck nodes
     for (const url of evonodeUrls) {
-      if (dapiUrls.length >= poolLimit) {
+      if (this.dapiUrls.length >= poolLimit) {
         break
       }
 
@@ -129,13 +140,14 @@ export default class GRPCConnectionPool {
         const { response } = await client.getBlockchainStatus(GetBlockchainStatusRequest.fromJson({}))
 
         if (response.status === GetBlockchainStatusResponse_Status.READY) {
-          dapiUrls.push(url)
+          this.dapiUrls.push(url)
         }
       } catch (e) {
       }
     }
 
-    this.dapiUrls = dapiUrls
+    // wait until every seed node responded or failed, so dead ones are removed from the pool
+    await Promise.allSettled(seedRequests)
   }
 
   /**
