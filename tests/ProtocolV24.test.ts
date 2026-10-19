@@ -117,6 +117,23 @@ describe('ProTx v3', () => {
     expect(payload.hex()).toBe(hex)
   })
 
+  test('ProUpServTx v3 without core p2p entry should leave ipAddress and port undefined', () => {
+    const hex = '0300' + '0000' + 'aa'.repeat(32) + '0100' + '00' + 'bb'.repeat(32) + 'dd'.repeat(96)
+
+    const payload = ProUpServTx.fromHex(hex)
+
+    expect(payload.ipAddress).toBeUndefined()
+    expect(payload.port).toBeUndefined()
+    expect(payload.toJSON().ipAddress).toBeUndefined()
+    expect(payload.hex()).toBe(hex)
+  })
+
+  test('ProUpServTx v2 without ipAddress should serialize an empty address', () => {
+    const payload = new ProUpServTx(2, 0, 'aa'.repeat(32), undefined, undefined, new Script(), 'bb'.repeat(32), undefined, undefined, undefined, 'dd'.repeat(96))
+
+    expect(payload.hex()).toBe('0200' + '0000' + 'aa'.repeat(32) + '00'.repeat(16) + '0000' + '00' + 'bb'.repeat(32) + 'dd'.repeat(96))
+  })
+
   test('ProRegTx v3 shared registration should parse and round-trip', () => {
     const share = (owner: string): string => '00743ba40b000000' + '0151' + '00' + owner.repeat(20)
     const hex = '0300' + '0000' + '0000' + 'ee'.repeat(32) + '00000000' + coreNetInfo +

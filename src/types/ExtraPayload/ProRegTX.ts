@@ -37,8 +37,9 @@ export class ProRegTX {
 
   collateralOutpoint: OutPoint
 
-  ipAddress: string
-  port: number
+  // undefined if a version 3 netInfo has no core p2p entry
+  ipAddress?: string
+  port?: number
   // netInfo: Uint8Array
 
   keyIdOwner: string
@@ -64,7 +65,7 @@ export class ProRegTX {
   earlyPeriodBlocks?: number
   earlyPenalty?: bigint
 
-  constructor (version: number, type: number, mode: number, collateralOutpoint: OutPoint, ipAddress: string, port: number, /* netInfo: Uint8Array, */ keyIdOwner: string, pubKeyOperator: string, keyIdVoting: string, operatorReward: number, scriptPayout: Script, inputsHash: string, platformNodeID: string | undefined, platformP2PPort: number | undefined, platformHTTPPort: number | undefined, payloadSig: string, extended?: ProRegTxExtendedFields) {
+  constructor (version: number, type: number, mode: number, collateralOutpoint: OutPoint, ipAddress: string | undefined, port: number | undefined, /* netInfo: Uint8Array, */ keyIdOwner: string, pubKeyOperator: string, keyIdVoting: string, operatorReward: number, scriptPayout: Script, inputsHash: string, platformNodeID: string | undefined, platformP2PPort: number | undefined, platformHTTPPort: number | undefined, payloadSig: string, extended?: ProRegTxExtendedFields) {
     this.version = version
     this.type = type
     this.mode = mode
@@ -127,8 +128,8 @@ export class ProRegTX {
     const collateralOutpoint = OutPoint.fromBytes(bytes.slice(cursor, cursor + 36))
     cursor += 36
 
-    let ipAddress: string
-    let port: number
+    let ipAddress: string | undefined
+    let port: number | undefined
     let netInfo: ExtNetInfo | undefined
 
     if (version >= PROTX_VERSION_EXT_ADDR) {
@@ -136,8 +137,8 @@ export class ProRegTX {
       cursor += netInfo.bytes().byteLength
 
       const primary = netInfo.getPrimaryEntry(NetInfoPurpose.CORE_P2P)
-      ipAddress = primary?.address ?? ''
-      port = primary?.port ?? 0
+      ipAddress = primary?.address
+      port = primary?.port
     } else {
       ipAddress = bytesToIp(bytes.slice(cursor, cursor + 16))
       cursor += 16
@@ -272,10 +273,11 @@ export class ProRegTX {
     if (isExtended) {
       ipAddressBytes = (this.netInfo ?? new ExtNetInfo()).bytes()
     } else {
-      ipAddressBytes = ipToBytes(this.ipAddress)
+      // an unset address serializes as an empty CService
+      ipAddressBytes = this.ipAddress !== undefined ? ipToBytes(this.ipAddress) : new Uint8Array(16)
 
       portBytes = new Uint8Array(2)
-      new DataView(portBytes.buffer, portBytes.byteOffset, portBytes.byteLength).setUint16(0, this.port, false)
+      new DataView(portBytes.buffer, portBytes.byteOffset, portBytes.byteLength).setUint16(0, this.port ?? 0, false)
     }
 
     const keyIdBytes = hexToBytes(this.keyIdOwner)

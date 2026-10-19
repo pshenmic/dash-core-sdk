@@ -19,8 +19,9 @@ export class ProUpServTx {
 
   proTxHash: string
 
-  ipAddress: string
-  port: number
+  // undefined if a version 3 netInfo has no core p2p entry
+  ipAddress?: string
+  port?: number
   // netInfo: Uint8Array
 
   scriptOperatorPayout: Script
@@ -36,7 +37,7 @@ export class ProUpServTx {
   // only if version >= 3, ipAddress and port then mirror the primary core p2p entry
   netInfo?: ExtNetInfo
 
-  constructor (version: number, type: number, proTxHash: string, ipAddress: string, port: number, /* netInfo: Uint8Array, */ scriptOperatorPayout: Script, inputsHash: string, platformNodeID: string | undefined, platformP2PPort: number | undefined, platformHTTPPort: number | undefined, payloadSig: string, netInfo?: ExtNetInfo) {
+  constructor (version: number, type: number, proTxHash: string, ipAddress: string | undefined, port: number | undefined, /* netInfo: Uint8Array, */ scriptOperatorPayout: Script, inputsHash: string, platformNodeID: string | undefined, platformP2PPort: number | undefined, platformHTTPPort: number | undefined, payloadSig: string, netInfo?: ExtNetInfo) {
     this.version = version
     this.type = type
 
@@ -83,8 +84,8 @@ export class ProUpServTx {
     const proTxHash = bytes.slice(cursor, cursor + 32)
     cursor += 32
 
-    let ipAddress: string
-    let port: number
+    let ipAddress: string | undefined
+    let port: number | undefined
     let netInfo: ExtNetInfo | undefined
 
     if (version >= PROTX_VERSION_EXT_ADDR) {
@@ -92,8 +93,8 @@ export class ProUpServTx {
       cursor += netInfo.bytes().byteLength
 
       const primary = netInfo.getPrimaryEntry(NetInfoPurpose.CORE_P2P)
-      ipAddress = primary?.address ?? ''
-      port = primary?.port ?? 0
+      ipAddress = primary?.address
+      port = primary?.port
     } else {
       ipAddress = bytesToIp(bytes.slice(cursor, cursor + 16))
       cursor += 16
@@ -171,10 +172,11 @@ export class ProUpServTx {
     if (isExtended) {
       ipAddressBytes = (this.netInfo ?? new ExtNetInfo()).bytes()
     } else {
-      ipAddressBytes = ipToBytes(this.ipAddress)
+      // an unset address serializes as an empty CService
+      ipAddressBytes = this.ipAddress !== undefined ? ipToBytes(this.ipAddress) : new Uint8Array(16)
 
       portBytes = new Uint8Array(2)
-      new DataView(portBytes.buffer, portBytes.byteOffset, portBytes.byteLength).setUint16(0, this.port, false)
+      new DataView(portBytes.buffer, portBytes.byteOffset, portBytes.byteLength).setUint16(0, this.port ?? 0, false)
     }
 
     const scriptOperatorPayoutBytes = this.scriptOperatorPayout.bytes()

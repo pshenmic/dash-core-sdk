@@ -125,8 +125,8 @@ export interface ProRegTxJSON {
   type: number
   mode: number
   collateralOutpoint: OutPointJSON
-  ipAddress: string
-  port: number
+  ipAddress?: string
+  port?: number
 
   keyIdOwner: string
   keyIdVoting: string
@@ -151,8 +151,8 @@ export interface ProUpServTxJSON {
   version: number
   type: number
   proTxHash: string
-  ipAddress: string
-  port: number
+  ipAddress?: string
+  port?: number
 
   scriptOperatorPayout: string
   inputsHash: string
