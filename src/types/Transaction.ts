@@ -1,8 +1,12 @@
 import {
+  ASSET_UNLOCK_PAYLOAD_SIZE,
+  ASSET_UNLOCK_QUORUM_INFO_SIZE,
+  ASSET_UNLOCK_STABLE_TXID_VERSION,
   CHANGE_OUTPUT_MAX_SIZE,
   DEFAULT_NLOCK_TIME,
   ExtraPayloadType, FEE_PER_BYTE, MIN_FEE_RELAY,
   NLOCK_TIME_BLOCK_BASED_LIMIT, OPCODES_ENUM, SIGHASH_ALL, SIGNED_INPUT_MAX_SIZE,
+  SPECIAL_TRANSACTION_VERSION,
   TRANSACTION_VERSION,
   TransactionType
 } from '../constants.js'
@@ -30,6 +34,11 @@ import { QcTx } from './ExtraPayload/QcTx.js'
 import { MnHfTx } from './ExtraPayload/MnHfTx.js'
 import { AssetLockTx } from './ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './ExtraPayload/AssetUnlockTx.js'
+import { ProDisTx } from './ExtraPayload/ProDisTx.js'
+import { ProUpShareTx } from './ExtraPayload/ProUpShareTx.js'
+import { ProUpSharedRegTx } from './ExtraPayload/ProUpSharedRegTx.js'
+import { OutPoint } from './OutPoint.js'
+import { RawExtraPayload } from './ExtraPayload/RawExtraPayload.js'
 
 export class Transaction {
   version: number
@@ -88,11 +97,77 @@ export class Transaction {
     }, BigInt(0))
   }
 
+  /**
+   * Transaction id
+   *
+   * For asset unlocks with payload version 2+ the quorum signing info (requestedHeight, quorumHash, quorumSig)
+   * is excluded from the hash, so every re-signed instance of one withdrawal shares one txid.
+   * The payload is serialized last, so that info occupies the trailing bytes of the transaction.
+   */
   hash (): string {
+    const bytes = this.bytes()
+
+    if (this.isAssetUnlockWithStableTxid()) {
+      bytes.fill(0, bytes.byteLength - ASSET_UNLOCK_QUORUM_INFO_SIZE)
+    }
+
+    return bytesToHex(doubleSHA256(bytes).toReversed())
+  }
+
+  /**
+   * Hash of the full serialization
+   *
+   * Equal to hash() for every transaction except version 2+ asset unlocks,
+   * where it distinguishes re-signed instances of one withdrawal
+   */
+  instanceHash (): string {
     return bytesToHex(doubleSHA256(this.bytes()).toReversed())
   }
 
+  /**
+   * Whether this is an asset unlock carrying a well-formed payload
+   *
+   * Judged from the payload bytes, like Dash Core, so it holds for a raw payload too
+   */
+  isAssetUnlockPayload (): boolean {
+    return this.version >= SPECIAL_TRANSACTION_VERSION &&
+      this.type === TransactionType.TRANSACTION_ASSET_UNLOCK &&
+      this.extraPayload?.bytes().byteLength === ASSET_UNLOCK_PAYLOAD_SIZE
+  }
+
+  /**
+   * Whether the txid is computed with the quorum signing info zeroed (asset unlock payload version 2+)
+   */
+  isAssetUnlockWithStableTxid (): boolean {
+    return this.isAssetUnlockPayload() && (this.extraPayload as ExtraPayload).bytes()[0] >= ASSET_UNLOCK_STABLE_TXID_VERSION
+  }
+
+  /**
+   * Outpoints that an InstantSend lock of this transaction pins
+   *
+   * These are the spent outpoints, except for asset unlocks, which have no inputs
+   * and pin the synthetic outpoint {request id of the withdrawal index, 0} instead
+   */
+  getLockInputs (): OutPoint[] {
+    if (this.isAssetUnlockPayload()) {
+      const payload = this.extraPayload instanceof AssetUnlockTx
+        ? this.extraPayload
+        : AssetUnlockTx.fromBytes((this.extraPayload as ExtraPayload).bytes())
+
+      return [payload.getLockOutPoint()]
+    }
+
+    return this.inputs.map(input => new OutPoint(input.txId, input.vOut))
+  }
+
+  /**
+   * Name of the decoded extra payload class, undefined when there is none or it is kept as RawExtraPayload
+   */
   getExtraPayloadType (): keyof typeof ExtraPayloadType | undefined {
+    if (this.extraPayload instanceof RawExtraPayload) {
+      return undefined
+    }
+
     switch (this.type) {
       case TransactionType.TRANSACTION_PROVIDER_REGISTER:
         return 'ProRegTx'
@@ -112,6 +187,12 @@ export class Transaction {
         return 'AssetLockTx'
       case TransactionType.TRANSACTION_ASSET_UNLOCK:
         return 'AssetUnlockTx'
+      case TransactionType.TRANSACTION_PROVIDER_DISSOLVE:
+        return 'ProDisTx'
+      case TransactionType.TRANSACTION_PROVIDER_UPDATE_SHARE:
+        return 'ProUpShareTx'
+      case TransactionType.TRANSACTION_PROVIDER_UPDATE_SHARED_REGISTRAR:
+        return 'ProUpSharedRegTx'
     }
 
     return undefined
@@ -378,7 +459,7 @@ export class Transaction {
     if (type !== 0 && lockTimePadding + 4 < bytes.length) {
       const extraPayloadSize = decodeCompactSize(lockTimePadding + 4, bytes)
 
-      let extraPayloadHandler: Function
+      let extraPayloadHandler: (bytes: Uint8Array) => ExtraPayload
 
       switch (type) {
         case TransactionType.TRANSACTION_PROVIDER_REGISTER:
@@ -408,11 +489,27 @@ export class Transaction {
         case TransactionType.TRANSACTION_ASSET_UNLOCK:
           extraPayloadHandler = AssetUnlockTx.fromBytes
           break
+        case TransactionType.TRANSACTION_PROVIDER_DISSOLVE:
+          extraPayloadHandler = ProDisTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_PROVIDER_UPDATE_SHARE:
+          extraPayloadHandler = ProUpShareTx.fromBytes
+          break
+        case TransactionType.TRANSACTION_PROVIDER_UPDATE_SHARED_REGISTRAR:
+          extraPayloadHandler = ProUpSharedRegTx.fromBytes
+          break
         default:
-          throw new Error(`Unsupported extra payload type ${type}`)
+          extraPayloadHandler = RawExtraPayload.fromBytes
       }
 
-      extraPayload = extraPayloadHandler(bytes.slice(lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize), lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize) + Number(extraPayloadSize)))
+      const extraPayloadBytes = bytes.slice(lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize), lockTimePadding + 4 + getCompactVariableSize(extraPayloadSize) + Number(extraPayloadSize))
+
+      try {
+        extraPayload = extraPayloadHandler(extraPayloadBytes)
+      } catch {
+        // e.g. a payload version introduced by a later hard fork, keep the bytes so the transaction still round-trips
+        extraPayload = RawExtraPayload.fromBytes(extraPayloadBytes)
+      }
     }
 
     return new Transaction(inputs, outputs, nLockTime, version, type, extraPayload)
@@ -430,7 +527,8 @@ export class Transaction {
       outputs: this.outputs.map(output => output.toJSON()),
       inputs: this.inputs.map(input => input.toJSON()),
       extraPayload: this.extraPayload?.toJSON() ?? null,
-      hash: this.hash()
+      hash: this.hash(),
+      ...(this.isAssetUnlockWithStableTxid() ? { instanceHash: this.instanceHash() } : {})
     }
   }
 }

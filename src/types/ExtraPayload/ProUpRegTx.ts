@@ -8,7 +8,8 @@ import {
   publicKeyHashToAddress
 } from '../../utils.js'
 import { NetworkLike, ProUpRegTxJSON } from '../../types.js'
-import { DEFAULT_NETWORK } from '../../constants.js'
+import { DEFAULT_NETWORK, PROTX_VERSION_EXT_ADDR } from '../../constants.js'
+import { PayoutShare } from '../PayoutShare.js'
 
 export class ProUpRegTx {
   version: number
@@ -23,7 +24,10 @@ export class ProUpRegTx {
 
   payloadSig: string
 
-  constructor (version: number, proTxHash: string, mode: number, pubKeyOperator: string, keyIdVoting: string, scriptPayout: Script, inputsHash: string, payloadSig: string) {
+  // only if version >= 3, scriptPayout then mirrors the first payout
+  payouts?: PayoutShare[]
+
+  constructor (version: number, proTxHash: string, mode: number, pubKeyOperator: string, keyIdVoting: string, scriptPayout: Script, inputsHash: string, payloadSig: string, payouts?: PayoutShare[]) {
     this.version = version
     this.proTxHash = proTxHash
     this.mode = mode
@@ -35,6 +39,8 @@ export class ProUpRegTx {
     this.inputsHash = inputsHash
 
     this.payloadSig = payloadSig
+
+    this.payouts = payouts
   }
 
   getVotingAddress (network: NetworkLike = DEFAULT_NETWORK): string {
@@ -50,6 +56,10 @@ export class ProUpRegTx {
 
     const version = dataView.getUint16(0, true)
 
+    if (version === 0 || version > PROTX_VERSION_EXT_ADDR) {
+      throw new Error(`Unsupported version of ProUpRegTx: ${version}`)
+    }
+
     const proTxHash = bytes.slice(2, 34)
 
     const mode = dataView.getUint16(34, true)
@@ -57,16 +67,34 @@ export class ProUpRegTx {
     const pubKeyOperator = bytes.slice(36, 84)
     const keyIdVoting = bytes.slice(84, 104)
 
-    const scriptPayoutSize = decodeCompactSize(104, bytes)
-    const scriptPayout = Script.fromBytes(bytes.slice(104 + getCompactVariableSize(scriptPayoutSize), 104 + getCompactVariableSize(scriptPayoutSize) + Number(scriptPayoutSize)))
+    let scriptPayout: Script
+    let payouts: PayoutShare[] | undefined
+    let inputsHashOffset: number
 
-    const inputsHashOffset = 104 + getCompactVariableSize(scriptPayoutSize) + Number(scriptPayoutSize)
+    if (version >= PROTX_VERSION_EXT_ADDR) {
+      payouts = []
+      const payoutsCount = dataView.getUint8(104)
+      inputsHashOffset = 105
+
+      for (let i = 0; i < payoutsCount; i++) {
+        const payout = PayoutShare.fromBytes(bytes.slice(inputsHashOffset))
+        inputsHashOffset += payout.bytes().byteLength
+        payouts.push(payout)
+      }
+
+      scriptPayout = payouts[0]?.scriptPayout ?? new Script()
+    } else {
+      const scriptPayoutSize = decodeCompactSize(104, bytes)
+      scriptPayout = Script.fromBytes(bytes.slice(104 + getCompactVariableSize(scriptPayoutSize), 104 + getCompactVariableSize(scriptPayoutSize) + Number(scriptPayoutSize)))
+
+      inputsHashOffset = 104 + getCompactVariableSize(scriptPayoutSize) + Number(scriptPayoutSize)
+    }
     const inputsHash = bytes.slice(inputsHashOffset, inputsHashOffset + 32)
 
     const payloadSigSize = decodeCompactSize(inputsHashOffset + 32, bytes)
     const payloadSig = bytes.slice(inputsHashOffset + 32 + getCompactVariableSize(payloadSigSize), inputsHashOffset + 32 + getCompactVariableSize(payloadSigSize) + Number(payloadSigSize))
 
-    return new ProUpRegTx(version, bytesToHex(proTxHash.toReversed()), mode, bytesToHex(pubKeyOperator), bytesToHex(keyIdVoting), scriptPayout, bytesToHex(inputsHash.toReversed()), bytesToHex(payloadSig))
+    return new ProUpRegTx(version, bytesToHex(proTxHash.toReversed()), mode, bytesToHex(pubKeyOperator), bytesToHex(keyIdVoting), scriptPayout, bytesToHex(inputsHash.toReversed()), bytesToHex(payloadSig), payouts)
   }
 
   static fromHex (hex: string): ProUpRegTx {
@@ -89,8 +117,25 @@ export class ProUpRegTx {
     const keyIdVotingBytes = new Uint8Array(20)
     keyIdVotingBytes.set(hexToBytes(this.keyIdVoting))
 
-    const scriptPayoutBytes = this.scriptPayout.bytes()
-    const scriptPayoutSizeBytes = encodeCompactSize(scriptPayoutBytes.byteLength)
+    let scriptPayoutBytes: Uint8Array<ArrayBufferLike>
+    let scriptPayoutSizeBytes: Uint8Array<ArrayBufferLike>
+
+    if (this.version >= PROTX_VERSION_EXT_ADDR) {
+      // payouts count and payouts take the place of the payout script
+      const payouts = (this.payouts ?? []).map(payout => payout.bytes())
+
+      scriptPayoutSizeBytes = new Uint8Array([payouts.length])
+      scriptPayoutBytes = new Uint8Array(payouts.reduce((acc, payout) => acc + payout.byteLength, 0))
+
+      let payoutOffset = 0
+      for (const payout of payouts) {
+        scriptPayoutBytes.set(payout, payoutOffset)
+        payoutOffset += payout.byteLength
+      }
+    } else {
+      scriptPayoutBytes = this.scriptPayout.bytes()
+      scriptPayoutSizeBytes = encodeCompactSize(scriptPayoutBytes.byteLength)
+    }
 
     const inputsHashBytes = new Uint8Array(32)
     inputsHashBytes.set(hexToBytes(this.inputsHash).toReversed())
@@ -127,8 +172,8 @@ export class ProUpRegTx {
       proTxHash: this.proTxHash,
       pubKeyOperator: this.pubKeyOperator,
       scriptPayout: this.scriptPayout.ASMString(),
-      version: this.version
-
+      version: this.version,
+      ...(this.payouts != null ? { payouts: this.payouts.map(payout => payout.toJSON()) } : {})
     }
   }
 }

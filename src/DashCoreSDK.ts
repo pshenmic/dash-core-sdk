@@ -31,6 +31,10 @@ import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './types/ExtraPayload/AssetUnlockTx.js'
 import { CbTx } from './types/ExtraPayload/CbTx.js'
 import { MnHfTx } from './types/ExtraPayload/MnHfTx.js'
+import { ProDisTx } from './types/ExtraPayload/ProDisTx.js'
+import { ProUpShareTx } from './types/ExtraPayload/ProUpShareTx.js'
+import { ProUpSharedRegTx } from './types/ExtraPayload/ProUpSharedRegTx.js'
+import { RawExtraPayload } from './types/ExtraPayload/RawExtraPayload.js'
 import { ProRegTX } from './types/ExtraPayload/ProRegTX.js'
 import { ProUpRegTx } from './types/ExtraPayload/ProUpRegTx.js'
 import { ProUpRevTx } from './types/ExtraPayload/ProUpRevTx.js'
@@ -78,12 +82,15 @@ export interface CoreKeyPair {
 
 export { BlockHeader } from './types/BlockHeader.js'
 export { BloomFilterWriter } from './types/BloomFilter.js'
+export { CollateralShare } from './types/CollateralShare.js'
+export { ExtNetInfo, NetInfoEntryType, NetInfoPurpose } from './types/ExtNetInfo.js'
 export { Input } from './types/Input.js'
 export { InstantLock } from './types/InstantLock.js'
 export { MerkleBlock } from './types/MerkleBlock.js'
 export { MerkleTree } from './types/MerkleTree.js'
 export { OutPoint } from './types/OutPoint.js'
 export { Output } from './types/Output.js'
+export { PayoutShare } from './types/PayoutShare.js'
 export { PrivateKey } from './types/PrivateKey.js'
 export { PublicKey } from './types/PublicKey.js'
 export { Script } from './types/Script.js'
@@ -94,11 +101,15 @@ const extraPayload = {
   AssetUnlockTx,
   CbTx,
   MnHfTx,
+  ProDisTx,
   ProRegTX,
   ProUpRegTx,
   ProUpRevTx,
   ProUpServTx,
-  QcTx
+  ProUpShareTx,
+  ProUpSharedRegTx,
+  QcTx,
+  RawExtraPayload
 }
 
 const messages = {
@@ -277,7 +288,14 @@ export class DashCoreSDK {
           break
         }
         case 'rawTransaction': {
-          const transaction = Transaction.fromBytes(hexToBytes(event.data))
+          let transaction: Transaction
+
+          try {
+            transaction = Transaction.fromBytes(hexToBytes(event.data))
+          } catch {
+            // bloom filters let through unrelated transactions, one that cannot be parsed must not end the wait
+            break
+          }
 
           const transactionMatchesPayment = transaction
             .outputs
@@ -303,7 +321,13 @@ export class DashCoreSDK {
           break
         }
         case 'instantSendLockMessage': {
-          const instantSendLock = InstantLock.fromHex(event.data)
+          let instantSendLock: InstantLock
+
+          try {
+            instantSendLock = InstantLock.fromHex(event.data)
+          } catch {
+            break
+          }
 
           if (pendingTransactions.has(instantSendLock.txId)) {
             return {

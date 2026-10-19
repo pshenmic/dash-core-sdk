@@ -77,6 +77,24 @@ describe('getEvonodeList', () => {
     ])
   })
 
+  it('should read the platform endpoint from addresses', async () => {
+    subscribeToMasternodeList.mockReturnValue(streamOf(encode({
+      mnList: [
+        { nType: 1, isValid: true, addresses: { core_p2p: ['68.67.122.23:19999'], platform_https: ['68.67.122.23:1443'] } },
+        { nType: 1, isValid: true, addresses: { core_p2p: ['[2001:db8::1]:9999'], platform_https: ['[2001:db8::1]:443'] } },
+        { nType: 1, isValid: true, addresses: { core_p2p: ['5.5.5.5:9999'], platform_https: ['evo.example.com:443'] } },
+        { nType: 1, isValid: true, addresses: { core_p2p: ['6.6.6.6:9999'] } },
+        { nType: 0, isValid: true, addresses: { core_p2p: ['7.7.7.7:9999'] } }
+      ]
+    })))
+
+    await expect(runWithTimers(getEvonodeList(NODES))).resolves.toEqual([
+      'https://68.67.122.23:1443',
+      'https://[2001:db8::1]:443',
+      'https://evo.example.com:443'
+    ])
+  })
+
   it('should skip regular masternodes, invalid entries and entries without a platform port', async () => {
     subscribeToMasternodeList.mockReturnValue(streamOf(encode({
       mnList: [

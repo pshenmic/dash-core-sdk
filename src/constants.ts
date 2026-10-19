@@ -51,10 +51,57 @@ export enum TransactionType {
   TRANSACTION_QUORUM_COMMITMENT = 6,
   TRANSACTION_MASTERNODE_HARD_FORK_SIGNAL = 7,
   TRANSACTION_ASSET_LOCK = 8,
-  TRANSACTION_ASSET_UNLOCK = 9
+  TRANSACTION_ASSET_UNLOCK = 9,
+  TRANSACTION_PROVIDER_DISSOLVE = 10,
+  TRANSACTION_PROVIDER_UPDATE_SHARE = 11,
+  TRANSACTION_PROVIDER_UPDATE_SHARED_REGISTRAR = 12
 }
 
 export const TRANSACTION_VERSION = 3
+
+/**
+ * ProTx payload version that replaced the legacy address with ExtNetInfo
+ * and the payout script with a list of payout shares
+ */
+export const PROTX_VERSION_EXT_ADDR = 3
+
+/**
+ * Minimal transaction version that carries type and extra payload
+ */
+export const SPECIAL_TRANSACTION_VERSION = 3
+
+/**
+ * 4 - requestedHeight
+ * 32 - quorumHash
+ * 96 - quorumSig
+ */
+export const ASSET_UNLOCK_QUORUM_INFO_SIZE = 4 + 32 + 96
+
+/**
+ * 1 - version
+ * 8 - index
+ * 4 - fee
+ */
+export const ASSET_UNLOCK_PAYLOAD_SIZE = 1 + 8 + 4 + ASSET_UNLOCK_QUORUM_INFO_SIZE
+
+/**
+ * Since this asset unlock payload version the txid is computed with the quorum info zeroed
+ */
+export const ASSET_UNLOCK_STABLE_TXID_VERSION = 2
+
+/**
+ * DIP-27 signing request id prefix, the request id SHA256d(prefix || index)
+ * identifies a withdrawal across every instance and version of its asset unlock
+ */
+export const ASSET_UNLOCK_REQUEST_ID_PREFIX = 'plwdtx'
+
+/**
+ * Shared masternode collateral template script: 0x04 "DSHC" OP_DROP OP_TRUE
+ *
+ * Anyone-can-spend at the script layer, consensus only allows it as the collateral
+ * output of a shared ProRegTx and only allows spending it via a ProDisTx
+ */
+export const SHARED_COLLATERAL_SCRIPT = '04445348437551'
 
 export const DEFAULT_NLOCK_TIME = 0
 
@@ -403,5 +450,10 @@ export enum ExtraPayloadType {
   'QcTx' = 5,
   'MnHfTx' = 6,
   'AssetLockTx' = 7,
-  'AssetUnlockTx' = 8
+  'AssetUnlockTx' = 8,
+  'ProDisTx' = 9,
+  'ProUpShareTx' = 10,
+  'ProUpSharedRegTx' = 11
 }
+
+export const COMPACT_SIGNATURE_SIZE = 65

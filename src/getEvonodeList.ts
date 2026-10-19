@@ -13,8 +13,35 @@ const MASTERNODE_TYPE_EVO = 1
 interface MasternodeListEntry {
   nType?: number
   isValid?: boolean
+  // "host:port" lists keyed by purpose (core_p2p, platform_p2p, platform_https)
+  addresses?: Record<string, string[]>
+  // deprecated, only reported by Dash Core started with -deprecatedrpc=service
   service?: string
   platformHTTPPort?: number
+}
+
+/**
+ * Platform HTTPS endpoint of an evonode as "host:port"
+ *
+ * Dash Core reports it in addresses.platform_https, also for entries still using
+ * the legacy address format. Older Core versions only report service and platformHTTPPort.
+ *
+ * @param entry - masternode list entry
+ */
+function getPlatformHTTPSEndpoint (entry: MasternodeListEntry): string | undefined {
+  const endpoint = entry.addresses?.platform_https?.[0]
+
+  if (typeof endpoint === 'string' && endpoint !== '') {
+    return endpoint
+  }
+
+  if (entry.service != null && entry.platformHTTPPort != null) {
+    const host = entry.service.slice(0, entry.service.lastIndexOf(':'))
+
+    return `${host}:${entry.platformHTTPPort}`
+  }
+
+  return undefined
 }
 
 /**
@@ -34,16 +61,10 @@ function toEvonodeUrls (masternodeListDiff: Uint8Array): string[] {
   }
 
   return mnList
-    .filter((entry) =>
-      entry.nType === MASTERNODE_TYPE_EVO &&
-      entry.isValid === true &&
-      entry.service != null &&
-      entry.platformHTTPPort != null)
-    .map((entry) => {
-      const [host] = (entry.service as string).split(':')
-
-      return `https://${host}:${entry.platformHTTPPort as number}`
-    })
+    .filter((entry) => entry.nType === MASTERNODE_TYPE_EVO && entry.isValid === true)
+    .map(getPlatformHTTPSEndpoint)
+    .filter((endpoint): endpoint is string => endpoint != null)
+    .map((endpoint) => `https://${endpoint}`)
 }
 
 /**

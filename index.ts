@@ -3,12 +3,15 @@ import { BlockJSON, TransactionJSON } from './src/types.js'
 import { Block } from './src/types/Block.js'
 import { BlockHeader } from './src/types/BlockHeader.js'
 import { BloomFilterWriter } from './src/types/BloomFilter.js'
+import { CollateralShare } from './src/types/CollateralShare.js'
+import { ExtNetInfo, NetInfoEntryType, NetInfoPurpose } from './src/types/ExtNetInfo.js'
 import { Input } from './src/types/Input.js'
 import { InstantLock } from './src/types/InstantLock.js'
 import { MerkleBlock } from './src/types/MerkleBlock.js'
 import { MerkleTree } from './src/types/MerkleTree.js'
 import { OutPoint } from './src/types/OutPoint.js'
 import { Output } from './src/types/Output.js'
+import { PayoutShare } from './src/types/PayoutShare.js'
 import { PrivateKey } from './src/types/PrivateKey.js'
 import { PublicKey } from './src/types/PublicKey.js'
 import { Script } from './src/types/Script.js'
@@ -24,13 +27,18 @@ export {
   ExtraPayload,
   Messages,
   BloomFilterWriter,
+  CollateralShare,
+  ExtNetInfo,
   Input,
   InstantLock,
   MerkleBlock,
   MerkleTree,
   Network,
+  NetInfoEntryType,
+  NetInfoPurpose,
   OutPoint,
   Output,
+  PayoutShare,
   PrivateKey,
   PublicKey,
   Script,
