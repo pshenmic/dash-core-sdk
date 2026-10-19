@@ -112,6 +112,8 @@ describe('ProTx v3', () => {
     expect(payload.platformP2PPort).toBeUndefined()
     expect(payload.platformHTTPPort).toBeUndefined()
     expect(payload.payloadSig).toBe('dd'.repeat(96))
+    expect(payload.toJSON().platformNodeID).toBe('cc'.repeat(20))
+    expect(payload.toJSON()).not.toHaveProperty('platformP2PPort')
     expect(payload.hex()).toBe(hex)
   })
 
@@ -137,6 +139,8 @@ describe('ProTx v3', () => {
     expect(payload.earlyPenalty).toBe(1000000000000n)
     expect(payload.inputsHash).toBe('66'.repeat(32))
     expect(payload.payloadSig).toBe('77'.repeat(65))
+    expect(payload.toJSON().payloadSig).toBe('77'.repeat(65))
+    expect(payload.toJSON()).not.toHaveProperty('platformNodeID')
     expect(payload.hex()).toBe(hex)
   })
 
@@ -150,6 +154,7 @@ describe('ProTx v3', () => {
     const parsed = Transaction.fromHex(tx.hex())
 
     expect((parsed.extraPayload as ProRegTX).platformNodeID).toBe('cc'.repeat(20))
+    expect((parsed.extraPayload as ProRegTX).toJSON().platformNodeID).toBe('cc'.repeat(20))
     expect((parsed.extraPayload as ProRegTX).hex()).toBe(hex)
   })
 

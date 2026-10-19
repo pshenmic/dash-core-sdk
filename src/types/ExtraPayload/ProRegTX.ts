@@ -411,6 +411,10 @@ export class ProRegTX {
       scriptPayout: this.scriptPayout.ASMString(),
       type: this.type,
       version: this.version,
+      payloadSig: this.payloadSig,
+      ...(this.platformNodeID !== undefined ? { platformNodeID: this.platformNodeID } : {}),
+      ...(this.platformP2PPort !== undefined ? { platformP2PPort: this.platformP2PPort } : {}),
+      ...(this.platformHTTPPort !== undefined ? { platformHTTPPort: this.platformHTTPPort } : {}),
       ...(this.version >= PROTX_VERSION_EXT_ADDR
         ? {
             netInfo: this.netInfo?.toJSON(),

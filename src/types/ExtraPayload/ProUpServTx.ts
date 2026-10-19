@@ -247,6 +247,9 @@ export class ProUpServTx {
       port: this.port,
       type: this.type,
       version: this.version,
+      ...(this.platformNodeID !== undefined ? { platformNodeID: this.platformNodeID } : {}),
+      ...(this.platformP2PPort !== undefined ? { platformP2PPort: this.platformP2PPort } : {}),
+      ...(this.platformHTTPPort !== undefined ? { platformHTTPPort: this.platformHTTPPort } : {}),
       ...(this.netInfo != null ? { netInfo: this.netInfo.toJSON() } : {})
     }
   }
