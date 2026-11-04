@@ -5,7 +5,8 @@ import {
   CHANGE_OUTPUT_MAX_SIZE,
   DEFAULT_NLOCK_TIME,
   ExtraPayloadType, FEE_PER_BYTE, MIN_FEE_RELAY,
-  NLOCK_TIME_BLOCK_BASED_LIMIT, OPCODES_ENUM, SIGHASH_ALL, SIGNED_INPUT_MAX_SIZE,
+  NLOCK_TIME_BLOCK_BASED_LIMIT, OPCODES_ENUM, PROTX_VERSION_EXT_ADDR, SHARED_MN_DISSOLVE_PREFIX, SHARED_MN_REG_CONSENT_PREFIX,
+  SIGHASH_ALL, SIGNED_INPUT_MAX_SIZE,
   SPECIAL_TRANSACTION_VERSION,
   TRANSACTION_VERSION,
   TransactionType
@@ -39,6 +40,7 @@ import { ProUpShareTx } from './ExtraPayload/ProUpShareTx.js'
 import { ProUpSharedRegTx } from './ExtraPayload/ProUpSharedRegTx.js'
 import { OutPoint } from './OutPoint.js'
 import { RawExtraPayload } from './ExtraPayload/RawExtraPayload.js'
+import { ExtNetInfo } from './ExtNetInfo.js'
 
 export class Transaction {
   version: number
@@ -122,6 +124,204 @@ export class Transaction {
    */
   instanceHash (): string {
     return bytesToHex(doubleSHA256(this.bytes()).toReversed())
+  }
+
+  /**
+   * Whether this is a shared masternode registration (ProRegTx version 3+ with a non-empty share table)
+   */
+  isSharedRegistration (): boolean {
+    return this.extraPayload instanceof ProRegTX &&
+      this.extraPayload.version >= PROTX_VERSION_EXT_ADDR &&
+      (this.extraPayload.shares?.length ?? 0) > 0
+  }
+
+  /**
+   * Digest every share owner signs to consent to a shared masternode registration (Dash Core CProRegTx::MakeSharedRegConsentHash)
+   *
+   * Binds the funding inputs and their sequences, all outputs, the share table, the penalty terms and the registrar configuration
+   */
+  consentHash (): string {
+    if (!this.isSharedRegistration()) {
+      throw new Error('Consent hash is only defined for a shared ProRegTx')
+    }
+
+    const payload = this.extraPayload as ProRegTX
+    const shares = payload.shares ?? []
+
+    const prefixBytes = new TextEncoder().encode(SHARED_MN_REG_CONSENT_PREFIX)
+    const prefixSizeBytes = encodeCompactSize(prefixBytes.byteLength)
+
+    const payloadVersionBytes = new Uint8Array(2)
+    new DataView(payloadVersionBytes.buffer, payloadVersionBytes.byteOffset, payloadVersionBytes.byteLength).setUint16(0, payload.version, true)
+
+    const versionWithTypeView = new DataView(new ArrayBuffer(4))
+    versionWithTypeView.setInt32(0, this.version | (this.type << 16), true)
+
+    const lockTimeView = new DataView(new ArrayBuffer(4))
+    lockTimeView.setUint32(0, this.#nLockTime, true)
+
+    const inputsHashBytes = doubleSHA256(this.#concatChunks(this.inputs.map(input => new OutPoint(input.txId, input.vOut).bytes())))
+    const sequencesBytes = this.#sequencesBytes()
+    const outputsHashBytes = doubleSHA256(this.#concatChunks(this.outputs.map(output => output.bytes())))
+
+    const typeBytes = new Uint8Array(2)
+    const modeBytes = new Uint8Array(2)
+
+    new DataView(typeBytes.buffer, typeBytes.byteOffset, typeBytes.byteLength).setUint16(0, payload.type, true)
+    new DataView(modeBytes.buffer, modeBytes.byteOffset, modeBytes.byteLength).setUint16(0, payload.mode, true)
+
+    const netInfoBytes = (payload.netInfo ?? new ExtNetInfo()).bytes()
+
+    let platformNodeIDBytes: Uint8Array<ArrayBufferLike> = new Uint8Array(0)
+
+    // Per Dash Core, platform node id is covered iff nType == MnType::Evo (1).
+    if (payload.type === 1) {
+      platformNodeIDBytes = hexToBytes(payload.platformNodeID ?? '').toReversed()
+    }
+
+    const keyIdVotingBytes = hexToBytes(payload.keyIdVoting)
+    const pubKeyOperatorBytes = hexToBytes(payload.pubKeyOperator)
+
+    const operatorRewardBytes = new Uint8Array(2)
+    new DataView(operatorRewardBytes.buffer, operatorRewardBytes.byteOffset, operatorRewardBytes.byteLength).setUint16(0, payload.operatorReward, true)
+
+    const sharesBytes = this.#concatChunks([new Uint8Array([shares.length]), ...shares.map(share => share.bytes())])
+
+    const earlyBytes = new Uint8Array(12)
+    const earlyView = new DataView(earlyBytes.buffer)
+    earlyView.setUint32(0, payload.earlyPeriodBlocks ?? 0, true)
+    earlyView.setBigInt64(4, payload.earlyPenalty ?? 0n, true)
+
+    const outBytes = new Uint8Array(
+      prefixSizeBytes.byteLength +
+      prefixBytes.byteLength +
+      payloadVersionBytes.byteLength +
+      versionWithTypeView.byteLength +
+      lockTimeView.byteLength +
+      inputsHashBytes.byteLength +
+      sequencesBytes.byteLength +
+      outputsHashBytes.byteLength +
+      typeBytes.byteLength +
+      modeBytes.byteLength +
+      netInfoBytes.byteLength +
+      platformNodeIDBytes.byteLength +
+      keyIdVotingBytes.byteLength +
+      pubKeyOperatorBytes.byteLength +
+      operatorRewardBytes.byteLength +
+      sharesBytes.byteLength +
+      earlyBytes.byteLength
+    )
+
+    let off = 0
+    outBytes.set(prefixSizeBytes, off); off += prefixSizeBytes.byteLength
+    outBytes.set(prefixBytes, off); off += prefixBytes.byteLength
+    outBytes.set(payloadVersionBytes, off); off += payloadVersionBytes.byteLength
+    outBytes.set(new Uint8Array(versionWithTypeView.buffer), off); off += versionWithTypeView.byteLength
+    outBytes.set(new Uint8Array(lockTimeView.buffer), off); off += lockTimeView.byteLength
+    outBytes.set(inputsHashBytes, off); off += inputsHashBytes.byteLength
+    outBytes.set(sequencesBytes, off); off += sequencesBytes.byteLength
+    outBytes.set(outputsHashBytes, off); off += outputsHashBytes.byteLength
+    outBytes.set(typeBytes, off); off += typeBytes.byteLength
+    outBytes.set(modeBytes, off); off += modeBytes.byteLength
+    outBytes.set(netInfoBytes, off); off += netInfoBytes.byteLength
+    outBytes.set(platformNodeIDBytes, off); off += platformNodeIDBytes.byteLength
+    outBytes.set(keyIdVotingBytes, off); off += keyIdVotingBytes.byteLength
+    outBytes.set(pubKeyOperatorBytes, off); off += pubKeyOperatorBytes.byteLength
+    outBytes.set(operatorRewardBytes, off); off += operatorRewardBytes.byteLength
+    outBytes.set(sharesBytes, off); off += sharesBytes.byteLength
+    outBytes.set(earlyBytes, off)
+
+    return bytesToHex(doubleSHA256(outBytes).toReversed())
+  }
+
+  /**
+   * Digest the ProDisTx signatures sign (Dash Core CProDisTx::MakeSignHash)
+   *
+   * Commits to the actual inputs and outputs and to the signature count, which selects the dissolution mode
+   */
+  dissolveSignHash (): string {
+    if (!(this.extraPayload instanceof ProDisTx)) {
+      throw new Error('Dissolve sign hash is only defined for a ProDisTx')
+    }
+
+    const payload = this.extraPayload
+
+    const prefixBytes = new TextEncoder().encode(SHARED_MN_DISSOLVE_PREFIX)
+    const prefixSizeBytes = encodeCompactSize(prefixBytes.byteLength)
+
+    const payloadVersionBytes = new Uint8Array(2)
+    new DataView(payloadVersionBytes.buffer, payloadVersionBytes.byteOffset, payloadVersionBytes.byteLength).setUint16(0, payload.version, true)
+
+    const versionWithTypeView = new DataView(new ArrayBuffer(4))
+    versionWithTypeView.setInt32(0, this.version | (this.type << 16), true)
+
+    const lockTimeView = new DataView(new ArrayBuffer(4))
+    lockTimeView.setUint32(0, this.#nLockTime, true)
+
+    const prevoutsBytes = this.#concatChunks(this.inputs.map(input => new OutPoint(input.txId, input.vOut).bytes()))
+    const sequencesBytes = this.#sequencesBytes()
+    const outputsBytes = this.#concatChunks(this.outputs.map(output => output.bytes()))
+
+    const proTxHashBytes = new Uint8Array(32)
+    proTxHashBytes.set(hexToBytes(payload.proTxHash).toReversed())
+
+    const actorIndexBytes = new Uint8Array(2)
+    new DataView(actorIndexBytes.buffer, actorIndexBytes.byteOffset, actorIndexBytes.byteLength).setUint16(0, payload.actorIndex, true)
+
+    const sigCountBytes = new Uint8Array([payload.sigs.length])
+
+    const outBytes = new Uint8Array(
+      prefixSizeBytes.byteLength +
+      prefixBytes.byteLength +
+      payloadVersionBytes.byteLength +
+      versionWithTypeView.byteLength +
+      lockTimeView.byteLength +
+      prevoutsBytes.byteLength +
+      sequencesBytes.byteLength +
+      outputsBytes.byteLength +
+      proTxHashBytes.byteLength +
+      actorIndexBytes.byteLength +
+      sigCountBytes.byteLength
+    )
+
+    let off = 0
+    outBytes.set(prefixSizeBytes, off); off += prefixSizeBytes.byteLength
+    outBytes.set(prefixBytes, off); off += prefixBytes.byteLength
+    outBytes.set(payloadVersionBytes, off); off += payloadVersionBytes.byteLength
+    outBytes.set(new Uint8Array(versionWithTypeView.buffer), off); off += versionWithTypeView.byteLength
+    outBytes.set(new Uint8Array(lockTimeView.buffer), off); off += lockTimeView.byteLength
+    outBytes.set(prevoutsBytes, off); off += prevoutsBytes.byteLength
+    outBytes.set(sequencesBytes, off); off += sequencesBytes.byteLength
+    outBytes.set(outputsBytes, off); off += outputsBytes.byteLength
+    outBytes.set(proTxHashBytes, off); off += proTxHashBytes.byteLength
+    outBytes.set(actorIndexBytes, off); off += actorIndexBytes.byteLength
+    outBytes.set(sigCountBytes, off)
+
+    return bytesToHex(doubleSHA256(outBytes).toReversed())
+  }
+
+  // nSequence of every input, in input order
+  #sequencesBytes (): Uint8Array {
+    const sequencesBytes = new Uint8Array(this.inputs.length * 4)
+    const sequencesView = new DataView(sequencesBytes.buffer)
+
+    this.inputs.forEach((input, i) => {
+      sequencesView.setUint32(i * 4, input.sequence, true)
+    })
+
+    return sequencesBytes
+  }
+
+  #concatChunks (chunks: Uint8Array[]): Uint8Array {
+    const out = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0))
+
+    let off = 0
+    for (const chunk of chunks) {
+      out.set(chunk, off)
+      off += chunk.byteLength
+    }
+
+    return out
   }
 
   /**
@@ -528,7 +728,9 @@ export class Transaction {
       inputs: this.inputs.map(input => input.toJSON()),
       extraPayload: this.extraPayload?.toJSON() ?? null,
       hash: this.hash(),
-      ...(this.isAssetUnlockWithStableTxid() ? { instanceHash: this.instanceHash() } : {})
+      ...(this.isAssetUnlockWithStableTxid() ? { instanceHash: this.instanceHash() } : {}),
+      ...(this.isSharedRegistration() ? { consentHash: this.consentHash() } : {}),
+      ...(this.extraPayload instanceof ProDisTx ? { dissolveSignHash: this.dissolveSignHash() } : {})
     }
   }
 }

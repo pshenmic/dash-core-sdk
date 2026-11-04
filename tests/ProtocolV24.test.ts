@@ -11,7 +11,9 @@ import { Output } from '../src/types/Output.js'
 import { Script } from '../src/types/Script.js'
 import { SHARED_COLLATERAL_SCRIPT, TransactionType } from '../src/constants.js'
 import { RawExtraPayload } from '../src/types/ExtraPayload/RawExtraPayload.js'
-import { bytesToHex, doubleSHA256 } from '../src/utils.js'
+import { bytesToHex, doubleSHA256, hexToBytes, publicKeyHashToAddress, SHA256RIPEMD160 } from '../src/utils.js'
+import { ProDisTx } from '../src/types/ExtraPayload/ProDisTx.js'
+import { secp256k1 } from '@noble/curves/secp256k1.js'
 
 const p2pkh = '76a914' + '99'.repeat(20) + '88ac'
 
@@ -273,5 +275,99 @@ describe('Undecodable extra payloads', () => {
 
     expect(raw.hash()).toBe(decoded.hash())
     expect(raw.getLockInputs()).toEqual(decoded.getLockInputs())
+  })
+})
+
+describe('Shared masternode sign hashes', () => {
+  const share = (owner: string): string => '00743ba40b000000' + '0151' + '00' + owner.repeat(20)
+  const sharedRegHex = '0300' + '0000' + '0000' + 'ee'.repeat(32) + '00000000' +
+    '01' + '01' + '00' + '01' + '01' + '01' + '04' + '01020304' + '270f' +
+    '11'.repeat(20) + '22'.repeat(48) + '33'.repeat(20) + '0000' +
+    '01' + '19' + p2pkh + '1027' +
+    '02' + share('44') + share('55') + 'f1'.repeat(65) + 'f2'.repeat(65) +
+    '00000100' + '0010a5d4e8000000' +
+    '66'.repeat(32) + '41' + '77'.repeat(65)
+
+  // mirrors the coverage checks of Dash Core evo_sharedmn_tests
+  const consentHash = (mutatePayload?: (payload: ProRegTX) => void, mutateTx?: (tx: Transaction) => void): string => {
+    const payload = ProRegTX.fromHex(sharedRegHex)
+    mutatePayload?.(payload)
+
+    const tx = new Transaction(
+      [new Input('aa'.repeat(32), 0, new Script(), 0xffffffff), new Input('bb'.repeat(32), 1, new Script(), 0xffffffff)],
+      [new Output(100000000000n, Script.sharedCollateral()), new Output(500000000n, Script.fromHex(p2pkh))],
+      0, 3, TransactionType.TRANSACTION_PROVIDER_REGISTER, payload
+    )
+    mutateTx?.(tx)
+
+    return tx.consentHash()
+  }
+
+  test('consentHash should cover the registration terms but not the join signatures', () => {
+    const base = consentHash()
+
+    expect(base).toMatch(/^[0-9a-f]{64}$/)
+    expect(consentHash(payload => { payload.joinSigs = ['42'.repeat(65), 'f2'.repeat(65)] })).toBe(base)
+
+    expect(consentHash(payload => { (payload.shares ?? [])[0].amount += 1n })).not.toBe(base)
+    expect(consentHash(payload => { payload.earlyPenalty = (payload.earlyPenalty as bigint) + 1n })).not.toBe(base)
+    expect(consentHash(payload => { payload.earlyPeriodBlocks = (payload.earlyPeriodBlocks as number) + 1 })).not.toBe(base)
+    expect(consentHash(payload => { payload.operatorReward = 100 })).not.toBe(base)
+    expect(consentHash(payload => { payload.keyIdVoting = '34'.repeat(20) })).not.toBe(base)
+    expect(consentHash(payload => { payload.pubKeyOperator = '23'.repeat(48) })).not.toBe(base)
+    expect(consentHash(payload => { payload.mode = 1 })).not.toBe(base)
+    expect(consentHash(payload => { payload.type = 1 })).not.toBe(base)
+
+    expect(consentHash(undefined, tx => { tx.inputs[0].vOut = 5 })).not.toBe(base)
+    expect(consentHash(undefined, tx => { tx.outputs[1].satoshis += 1n })).not.toBe(base)
+    expect(consentHash(undefined, tx => { tx.inputs[1].sequence = 0xffff })).not.toBe(base)
+    expect(consentHash(undefined, tx => { tx.nLockTime = 1 })).not.toBe(base)
+  })
+
+  test('consentHash should cover the platform node id of an evo node only', () => {
+    expect(consentHash(payload => { payload.platformNodeID = '01'.repeat(20) })).toBe(consentHash())
+
+    const evo = (payload: ProRegTX): void => { payload.type = 1; payload.platformNodeID = '00'.repeat(20) }
+    expect(consentHash(payload => { evo(payload); payload.platformNodeID = '01'.repeat(20) })).not.toBe(consentHash(evo))
+  })
+
+  test('consentHash should be exposed in toJSON only for a shared ProRegTx', () => {
+    const shared = new Transaction([], [], 0, 3, TransactionType.TRANSACTION_PROVIDER_REGISTER, ProRegTX.fromHex(sharedRegHex))
+    expect(shared.toJSON().consentHash).toBe(shared.consentHash())
+
+    const regular = Transaction.fromHex(new Transaction([], [], 0, 3, TransactionType.TRANSACTION_PROVIDER_REGISTER, ProRegTX.fromHex(sharedRegHex.replace('02' + share('44') + share('55') + 'f1'.repeat(65) + 'f2'.repeat(65), '00'))).hex())
+    expect(regular.isSharedRegistration()).toBe(false)
+    expect(regular.toJSON()).not.toHaveProperty('consentHash')
+    expect(() => regular.consentHash()).toThrow('shared ProRegTx')
+  })
+
+  // Dash Core v24.0.0-rc.4 regtest vector (feature_masternode_shares.py): unanimous dissolution of a 2-share masternode
+  const unanimousDissolution = '03000a00015745b50c2413bbe4e02d8e18c3958b4c74e245a6396fe9ad92cfe3d0185be3190100000000ffffffff0200743ba40b0000001976a914c508b6677c1ead65e9378877507dccc10d0aea5488ac60ed39a40b0000001976a914a45144abc7b983fc43d4def8234f5c7a424b6dd988ac00000000a701005745b50c2413bbe4e02d8e18c3958b4c74e245a6396fe9ad92cfe3d0185be31900000220c2b7f317b87f5183b45c3201a87ee6950d717b077f85c89ebb3c5e2d1a2697b15eed990189b8db0791bdf901b44d613348ccbbe4ba7c00e1f3c750c92000e6902033d7e9077e796f059b29e8e1b134bcf2b66ad929ee5342e28d4ec88212247c9578bc05de26f75292943bab199e2dea6f967cdccce5393c07710d0d42240f872d'
+
+  test('dissolveSignHash should match the digest Dash Core signed', () => {
+    const tx = Transaction.fromHex(unanimousDissolution)
+    const payload = tx.extraPayload as ProDisTx
+    const digest = hexToBytes(tx.dissolveSignHash()).toReversed()
+
+    const signers = payload.sigs.map(sig => {
+      const sigBytes = hexToBytes(sig)
+      const signature = secp256k1.Signature.fromBytes(sigBytes.slice(1), 'compact').addRecoveryBit((sigBytes[0] - 27) & 3)
+
+      return publicKeyHashToAddress(SHA256RIPEMD160(signature.recoverPublicKey(digest).toBytes(true)), 'testnet')
+    })
+
+    expect(tx.hash()).toBe('8fb8eb63b65f3fba7035e516bda78ae7c866a56bebb73a1287e52693c15e3e13')
+    expect(signers).toEqual(['yfU9nCccy4FXsFE4emBJanb4DJPEwF3hRk', 'yiSFAk9MzN5NSRtp5eBuU8nLsgisjCtSiF'])
+    expect(tx.toJSON().dissolveSignHash).toBe(tx.dissolveSignHash())
+  })
+
+  test('dissolveSignHash should commit to the signature count', () => {
+    const tx = Transaction.fromHex(unanimousDissolution)
+    const base = tx.dissolveSignHash();
+
+    (tx.extraPayload as ProDisTx).sigs.pop()
+
+    expect(tx.dissolveSignHash()).not.toBe(base)
+    expect(() => new Transaction().dissolveSignHash()).toThrow('ProDisTx')
   })
 })
