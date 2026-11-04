@@ -18,6 +18,8 @@ import { Script } from './src/types/Script.js'
 import { Transaction } from './src/types/Transaction.js'
 import { Network, TransactionType } from './src/constants.js'
 import * as utils from './src/utils.js'
+import { recoverCompact, signCompact, verifyCompact } from './src/compactSignature.js'
+import { consentHash, dissolveSignHash } from './src/consent.js'
 
 export {
   DashCoreSDK,
@@ -28,6 +30,8 @@ export {
   Messages,
   BloomFilterWriter,
   CollateralShare,
+  consentHash,
+  dissolveSignHash,
   ExtNetInfo,
   Input,
   InstantLock,
@@ -41,11 +45,14 @@ export {
   PayoutShare,
   PrivateKey,
   PublicKey,
+  recoverCompact,
   Script,
+  signCompact,
   Transaction,
   TransactionJSON,
   TransactionType,
-  utils
+  utils,
+  verifyCompact
 }
 
 export type {
