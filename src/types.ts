@@ -47,6 +47,10 @@ export interface TransactionJSON {
   hash: string
   // only for version 2+ asset unlocks, hash of the full serialization
   instanceHash?: string
+  // only for a shared ProRegTx
+  consentHash?: string
+  // only for a ProDisTx
+  dissolveSignHash?: string
   extraPayload: ProRegTxJSON
   | ProUpRegTxJSON
   | ProUpRevTxJSON

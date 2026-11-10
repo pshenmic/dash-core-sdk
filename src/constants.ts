@@ -96,6 +96,16 @@ export const ASSET_UNLOCK_STABLE_TXID_VERSION = 2
 export const ASSET_UNLOCK_REQUEST_ID_PREFIX = 'plwdtx'
 
 /**
+ * Domain tag of the digest every share owner signs to consent to a shared masternode registration
+ */
+export const SHARED_MN_REG_CONSENT_PREFIX = 'DashSharedMNReg'
+
+/**
+ * Domain tag of the digest the ProDisTx signatures sign
+ */
+export const SHARED_MN_DISSOLVE_PREFIX = 'DashSharedMNDissolve'
+
+/**
  * Shared masternode collateral template script: 0x04 "DSHC" OP_DROP OP_TRUE
  *
  * Anyone-can-spend at the script layer, consensus only allows it as the collateral
