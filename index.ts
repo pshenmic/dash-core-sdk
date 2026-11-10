@@ -16,7 +16,7 @@ import { PrivateKey } from './src/types/PrivateKey.js'
 import { PublicKey } from './src/types/PublicKey.js'
 import { Script } from './src/types/Script.js'
 import { Transaction } from './src/types/Transaction.js'
-import { Network, TransactionType } from './src/constants.js'
+import { Network, SHARED_COLLATERAL_SCRIPT, TransactionType } from './src/constants.js'
 import * as utils from './src/utils.js'
 
 export {
@@ -45,6 +45,7 @@ export {
   Transaction,
   TransactionJSON,
   TransactionType,
+  SHARED_COLLATERAL_SCRIPT,
   utils
 }
 
