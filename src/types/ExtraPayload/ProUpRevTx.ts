@@ -1,8 +1,11 @@
 import {
   bytesToHex,
+  doubleSHA256,
   hexToBytes
 } from '../../utils.js'
 import { ProUpRevTxJSON } from '../../types.js'
+import { BLS_SIGNATURE_SIZE, PROTX_BASIC_BLS_VERSION } from '../../constants.js'
+import { blsSign } from '../../bls.js'
 
 export class ProUpRevTx {
   version: number
@@ -40,6 +43,12 @@ export class ProUpRevTx {
   }
 
   bytes (): Uint8Array {
+    return this.#serialize(true)
+  }
+
+  // withSignature false is Core's SER_GETHASH form: no sig.
+  // An unsigned payload has no signature bytes at all, not 96 zero bytes.
+  #serialize (withSignature: boolean): Uint8Array {
     const versionBytes = new Uint8Array(2)
     const reasonBytes = new Uint8Array(2)
 
@@ -52,9 +61,9 @@ export class ProUpRevTx {
     const inputsHashBytes = new Uint8Array(32)
     inputsHashBytes.set(hexToBytes(this.inputsHash).toReversed())
 
-    const payloadSigBytes = hexToBytes(this.payloadSig)
+    const payloadSigBytes = withSignature ? hexToBytes(this.payloadSig) : new Uint8Array(0)
 
-    const outBytes = new Uint8Array(164)
+    const outBytes = new Uint8Array(68 + payloadSigBytes.byteLength)
 
     outBytes.set(versionBytes, 0)
     outBytes.set(proTxHashBytes, 2)
@@ -67,6 +76,34 @@ export class ProUpRevTx {
 
   hex (): string {
     return bytesToHex(this.bytes())
+  }
+
+  /**
+   * SHA256d of the payload without the signature, in internal byte order (Dash Core ::SerializeHash)
+   */
+  payloadHash (): Uint8Array {
+    return doubleSHA256(this.#serialize(false))
+  }
+
+  /**
+   * Sign with the operator BLS secret key, a basic scheme signature over payloadHash
+   *
+   * Set inputsHash (Transaction.providerInputsHash) and every other field first, the signature covers them.
+   * Version 1 payloads use the legacy BLS scheme, which is not supported.
+   */
+  signWithOperatorKey (blsSecretKey: Uint8Array): void {
+    if (this.version < PROTX_BASIC_BLS_VERSION) {
+      throw new Error(`Payload version ${this.version} uses the legacy BLS scheme, which cannot be signed`)
+    }
+
+    this.payloadSig = bytesToHex(blsSign(this.payloadHash(), blsSecretKey))
+  }
+
+  /**
+   * Payload size once signed with a 96 byte BLS signature
+   */
+  signedSize (): number {
+    return this.#serialize(false).byteLength + BLS_SIGNATURE_SIZE
   }
 
   toJSON (): ProUpRevTxJSON {

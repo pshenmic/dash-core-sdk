@@ -4,6 +4,7 @@ import {
   bytesToHex,
   bytesToIp,
   decodeCompactSize,
+  doubleSHA256,
   encodeCompactSize,
   getCompactVariableSize,
   hexToBytes,
@@ -14,6 +15,8 @@ import { COMPACT_SIGNATURE_SIZE, DEFAULT_NETWORK, PROTX_VERSION_EXT_ADDR } from 
 import { ExtNetInfo, NetInfoPurpose } from '../ExtNetInfo.js'
 import { PayoutShare } from '../PayoutShare.js'
 import { CollateralShare } from '../CollateralShare.js'
+import { PrivateKey } from '../PrivateKey.js'
+import { signMessage } from '../../signing.js'
 
 /**
  * Fields that replace the address and the payout script since ProTx version 3
@@ -256,6 +259,11 @@ export class ProRegTX {
   }
 
   bytes (): Uint8Array {
+    return this.#serialize(true)
+  }
+
+  // withSignature false is Core's SER_GETHASH form: no payloadSig and no length prefix
+  #serialize (withSignature: boolean): Uint8Array {
     const versionBytes = new Uint8Array(2)
     const typeBytes = new Uint8Array(2)
     const modeBytes = new Uint8Array(2)
@@ -348,8 +356,8 @@ export class ProRegTX {
       }
     }
 
-    const payloadSigBytes = hexToBytes(this.payloadSig)
-    const payloadSigSizeBytes = encodeCompactSize(payloadSigBytes.byteLength)
+    const payloadSigBytes = withSignature ? hexToBytes(this.payloadSig) : new Uint8Array(0)
+    const payloadSigSizeBytes = withSignature ? encodeCompactSize(payloadSigBytes.byteLength) : new Uint8Array(0)
 
     const outBytes = new Uint8Array(
       versionBytes.byteLength +
@@ -397,6 +405,58 @@ export class ProRegTX {
 
   hex (): string {
     return bytesToHex(this.bytes())
+  }
+
+  /**
+   * SHA256d of the payload without payloadSig, in internal byte order (Dash Core ::SerializeHash)
+   */
+  payloadHash (): Uint8Array {
+    return doubleSHA256(this.#serialize(false))
+  }
+
+  /**
+   * Whether the collateral is an existing outpoint, which needs a collateral key signature.
+   * A null collateral hash points at an output of this ProRegTx itself and is left unsigned.
+   */
+  hasExternalCollateral (): boolean {
+    return /[^0]/.test(this.collateralOutpoint.txId)
+  }
+
+  /**
+   * Message the collateral key signs (Dash Core CProRegTx::MakeSignString):
+   * payout|operatorReward|ownerAddress|votingAddress|payloadHash
+   *
+   * The payout is its address, or the script hex if it has none; the hash is printed byte-reversed
+   */
+  signString (network: NetworkLike = DEFAULT_NETWORK): string {
+    const payout = this.scriptPayout.getAddress(network) ?? this.scriptPayout.hex()
+
+    return [
+      payout,
+      this.operatorReward.toString(),
+      this.getOwnerAddress(network),
+      this.getVotingAddress(network),
+      bytesToHex(this.payloadHash().toReversed())
+    ].join('|')
+  }
+
+  /**
+   * Sign with the key of an external collateral, a message signature over signString
+   *
+   * Set inputsHash (Transaction.providerInputsHash) and every other field first, the signature covers them
+   */
+  signWithCollateralKey (privateKey: PrivateKey, network: NetworkLike = privateKey.network): void {
+    this.payloadSig = bytesToHex(signMessage(this.signString(network), privateKey))
+  }
+
+  /**
+   * Payload size once signed: a 65 byte compact signature for an external collateral, none otherwise
+   */
+  signedSize (): number {
+    const unsignedSize = this.#serialize(false).byteLength
+    const signatureSize = this.hasExternalCollateral() ? COMPACT_SIGNATURE_SIZE : 0
+
+    return unsignedSize + getCompactVariableSize(signatureSize) + signatureSize
   }
 
   toJSON (): ProRegTxJSON {

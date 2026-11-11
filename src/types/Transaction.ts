@@ -5,7 +5,7 @@ import {
   CHANGE_OUTPUT_MAX_SIZE,
   DEFAULT_NLOCK_TIME,
   ExtraPayloadType, FEE_PER_BYTE, MIN_FEE_RELAY,
-  NLOCK_TIME_BLOCK_BASED_LIMIT, OPCODES_ENUM, PROTX_VERSION_EXT_ADDR, SHARED_MN_DISSOLVE_PREFIX, SHARED_MN_REG_CONSENT_PREFIX,
+  NLOCK_TIME_BLOCK_BASED_LIMIT, OPCODES_ENUM, P2PKH_SCRIPT_SIG_MAX_SIZE, PROTX_VERSION_EXT_ADDR, SHARED_MN_DISSOLVE_PREFIX, SHARED_MN_REG_CONSENT_PREFIX,
   SIGHASH_ALL, SIGNED_INPUT_MAX_SIZE,
   SPECIAL_TRANSACTION_VERSION,
   TRANSACTION_VERSION,
@@ -298,6 +298,55 @@ export class Transaction {
     outBytes.set(sigCountBytes, off)
 
     return bytesToHex(doubleSHA256(outBytes).toReversed())
+  }
+
+  /**
+   * Hash of the spent outpoints a provider payload commits to (Dash Core CalcTxInputsHash):
+   * SHA256d of the concatenated input outpoints
+   *
+   * Set into the payload's inputsHash when it has one; call after the inputs are final and before signing the payload
+   */
+  providerInputsHash (): string {
+    const inputsHash = bytesToHex(doubleSHA256(this.#concatChunks(this.inputs.map(input => new OutPoint(input.txId, input.vOut).bytes()))).toReversed())
+
+    if (this.extraPayload !== undefined && 'inputsHash' in this.extraPayload) {
+      this.extraPayload.inputsHash = inputsHash
+    }
+
+    return inputsHash
+  }
+
+  /**
+   * Transaction size once signed, for fee estimation
+   *
+   * An input without a scriptSig counts as the largest P2PKH scriptSig sign() produces
+   * (73 byte DER signature with sighash, 33 byte compressed key); a provider payload counts with its signature
+   */
+  signedSize (): number {
+    const inputsSize = this.inputs.reduce((acc, input) => {
+      const scriptSigSize = input.scriptSig.bytes().byteLength > 0 ? input.scriptSig.bytes().byteLength : P2PKH_SCRIPT_SIG_MAX_SIZE
+
+      return acc + 36 + getCompactVariableSize(scriptSigSize) + scriptSigSize + 4
+    }, 0)
+
+    const outputsSize = this.outputs.reduce((acc, output) => acc + output.bytes().byteLength, 0)
+
+    let extraPayloadSize = 0
+
+    if (this.type !== TransactionType.TRANSACTION_NORMAL) {
+      const payload = this.extraPayload
+      const payloadSize = payload === undefined
+        ? 0
+        : 'signedSize' in payload ? payload.signedSize() : payload.bytes().byteLength
+
+      extraPayloadSize = getCompactVariableSize(payloadSize) + payloadSize
+    }
+
+    return 4 +
+      getCompactVariableSize(this.inputs.length) + inputsSize +
+      getCompactVariableSize(this.outputs.length) + outputsSize +
+      4 +
+      extraPayloadSize
   }
 
   // nSequence of every input, in input order

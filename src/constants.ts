@@ -30,6 +30,12 @@ export const SIGHASH_ALL = 0x01
  * 108 - max scripSig size (SIG + PubKey Inner)
  * 4 - sequence
  */
+/**
+ * Largest P2PKH scriptSig Transaction.sign produces:
+ * push(73 byte DER signature with sighash) + push(33 byte compressed public key)
+ */
+export const P2PKH_SCRIPT_SIG_MAX_SIZE = 1 + 73 + 1 + 33
+
 export const SIGNED_INPUT_MAX_SIZE = 32 + 4 + 8 + 108 + 4
 
 /**
@@ -467,3 +473,96 @@ export enum ExtraPayloadType {
 }
 
 export const COMPACT_SIGNATURE_SIZE = 65
+
+/**
+ * Coinbase special transaction payload versions (Dash Core CCbTx::Version)
+ */
+export enum CbTxVersion {
+  INVALID = 0,
+  MERKLE_ROOT_MNLIST = 1,
+  MERKLE_ROOT_QUORUMS = 2,
+  CLSIG_AND_BALANCE = 3,
+  // adds merkleRootAssetUnlocks, protocol v24
+  V24 = 4
+}
+
+/**
+ * Whether a coinbase payload version is the v24 one, true exactly when it is 4
+ */
+export function isCbTxV24 (version: number): boolean {
+  return version === CbTxVersion.V24
+}
+
+/**
+ * Magic prefix of signed messages (Dash Core strMessageMagic)
+ */
+export const MESSAGE_MAGIC = 'DarkCoin Signed Message:\n'
+
+/**
+ * Header byte of a compact signature is 27 + recovery id, plus 4 when the key is compressed
+ */
+export const COMPACT_SIGNATURE_HEADER_BASE = 27
+export const COMPACT_SIGNATURE_COMPRESSED_FLAG = 4
+
+/**
+ * BLS12-381 G1 public key and G2 signature sizes
+ */
+export const BLS_PUBLIC_KEY_SIZE = 48
+export const BLS_SIGNATURE_SIZE = 96
+export const BLS_SECRET_KEY_SIZE = 32
+
+/**
+ * ProTx payload version that switched BLS from the legacy to the basic scheme
+ */
+export const PROTX_LEGACY_BLS_VERSION = 1
+export const PROTX_BASIC_BLS_VERSION = 2
+
+/**
+ * HMAC key of the dashbls HD master and the DIP-3 provider key derivation levels:
+ * m/9'/coinType'/3'/role'
+ */
+export const BLS_HD_SEED_KEY = 'BLS HD seed'
+export const DIP9_PURPOSE = 9
+export const MASTERNODE_FEATURE = 3
+export const COIN_TYPE = {
+  [Network.Mainnet]: 5,
+  [Network.Testnet]: 1
+}
+
+export enum MasternodeKeyRole {
+  COLLATERAL = 0,
+  VOTING = 1,
+  OWNER = 2,
+  OPERATOR = 3,
+  PLATFORM_NODE = 4
+}
+
+/**
+ * Governance vote outcome codes (Dash Core vote_outcome_enum_t)
+ */
+export enum VoteOutcome {
+  NONE = 0,
+  YES = 1,
+  NO = 2,
+  ABSTAIN = 3
+}
+
+/**
+ * Governance vote signal codes (Dash Core vote_signal_enum_t)
+ */
+export enum VoteSignal {
+  NONE = 0,
+  FUNDING = 1,
+  VALID = 2,
+  DELETE = 3,
+  ENDORSED = 4
+}
+
+/**
+ * Governance object type codes (Dash Core GovernanceObject)
+ */
+export enum GovernanceObjectType {
+  UNKNOWN = 0,
+  PROPOSAL = 1,
+  TRIGGER = 2
+}

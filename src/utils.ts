@@ -273,3 +273,22 @@ export function createAssetLockProof (data: InstantAssetLockProofData | ChainAss
     throw new Error('Invalid lock params')
   }
 }
+
+export function concatBytes (...chunks: Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0))
+
+  let offset = 0
+  for (const chunk of chunks) {
+    out.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return out
+}
+
+/**
+ * Varint length followed by the bytes, as Core serializes a std::vector<unsigned char> or std::string
+ */
+export function encodeVarBytes (bytes: Uint8Array): Uint8Array {
+  return concatBytes(encodeCompactSize(bytes.byteLength), bytes)
+}
