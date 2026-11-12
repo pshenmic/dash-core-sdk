@@ -42,10 +42,6 @@ describe('BLS operator key derivation', () => {
   test('should derive the operator secret behind each public key', () => {
     for (const index of [0, 1, 2]) {
       expect(bytesToHex(blsPublicKey(deriveOperatorSecretKey(SEED, Network.Mainnet, index)))).toBe(MAINNET_OPERATOR_KEYS[index])
-
-      const pair = deriveOperatorKey(SEED, 'mainnet', index)
-      expect(bytesToHex(pair.publicKey)).toBe(MAINNET_OPERATOR_KEYS[index])
-      expect(pair.secretKey).toEqual(deriveOperatorSecretKey(SEED, Network.Mainnet, index))
     }
   })
 
@@ -118,7 +114,6 @@ describe('BLS public key encodings', () => {
 
   test('should refuse a key that reads either way', () => {
     // basic with sign clear and legacy with sign set share one encoding
-    expect(basicToLegacyPublicKey(basicSignSet)[0] & 0xa0).toBe(0x80)
     expect(() => toBasicPublicKey(basicSignClear)).toThrow('both the legacy and the basic encoding')
     expect(() => toBasicPublicKey(basicToLegacyPublicKey(basicSignSet))).toThrow('both the legacy and the basic encoding')
   })

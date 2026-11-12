@@ -7,6 +7,8 @@ import {
   encodeVarBytes,
   getCompactVariableSize,
   hexToBytes,
+  int32Bytes,
+  int64Bytes,
   networkValueToEnumValue
 } from '../../utils.js'
 import { GovernanceVoteJSON, NetworkLike } from '../../types.js'
@@ -149,18 +151,4 @@ export class GovernanceVote {
       hash: this.hash()
     }
   }
-}
-
-function int32Bytes (value: number): Uint8Array {
-  const bytes = new Uint8Array(4)
-  new DataView(bytes.buffer).setInt32(0, value, true)
-
-  return bytes
-}
-
-function int64Bytes (value: number): Uint8Array {
-  const bytes = new Uint8Array(8)
-  new DataView(bytes.buffer).setBigInt64(0, BigInt(value), true)
-
-  return bytes
 }

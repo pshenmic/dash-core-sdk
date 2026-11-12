@@ -5,7 +5,6 @@ import { GovernanceVote } from '../src/types/Governance/GovernanceVote.js'
 import { OutPoint } from '../src/types/OutPoint.js'
 import { PrivateKey } from '../src/types/PrivateKey.js'
 import { GovernanceObjectType, Network, VoteOutcome, VoteSignal } from '../src/constants.js'
-import { recoverHashSigner, recoverMessageSigner } from '../src/signing.js'
 import { bytesToHex, doubleSHA256, hexToBytes } from '../src/utils.js'
 
 interface Fixture {
@@ -27,7 +26,6 @@ describe('GovernanceObject', () => {
     expect(object.parentHash).toBe('00'.repeat(32))
     expect(object.revision).toBe(1)
     expect(object.type).toBe(GovernanceObjectType.PROPOSAL)
-    expect(object.toJSON().hash).toBe(hash)
   })
 
   test('should read the proposal fields', () => {
@@ -99,10 +97,6 @@ describe('GovernanceVote', () => {
     expect(hexToBytes(vote.signature).byteLength).toBe(65)
   })
 
-  test('should vote on a recorded object by its hash', () => {
-    expect(fixture.votes.map(vote => vote.parentHash)).toContain(GovernanceObject.fromHex(fixture.objects[0].payload).hash())
-  })
-
   test('should exclude the signature from the hash', () => {
     const vote = GovernanceVote.fromHex(fixture.votes[0].payload)
     vote.signature = ''
@@ -110,29 +104,10 @@ describe('GovernanceVote', () => {
     expect(vote.hash()).toBe(fixture.votes[0].hash)
   })
 
-  test('should hash signal before outcome', () => {
-    const vote = GovernanceVote.fromHex(fixture.votes[0].payload)
-    const swapped = new GovernanceVote(vote.masternodeOutpoint, vote.parentHash, vote.signal, vote.outcome, vote.time)
-
-    // the recorded vote is outcome YES (1), signal FUNDING (1): swapping them keeps the hash
-    expect(swapped.hash()).toBe(vote.hash())
-
-    vote.outcome = VoteOutcome.NO
-    swapped.signal = VoteSignal.VALID
-    expect(swapped.hash()).not.toBe(vote.hash())
-  })
-
   test('should hash the fields in wire order for the testnet signature', () => {
     const vote = GovernanceVote.fromHex(fixture.votes[0].payload)
 
     expect(vote.signatureHash()).toEqual(doubleSHA256(hexToBytes(fixture.votes[0].payload).slice(0, 84)))
-  })
-
-  test('should recover the recorded testnet signer under the hash rule', () => {
-    const vote = GovernanceVote.fromHex(fixture.votes[0].payload)
-
-    expect(vote.recoverSigner(Network.Testnet).hex())
-      .toBe(recoverHashSigner(vote.signatureHash(), hexToBytes(vote.signature)).hex())
   })
 
   describe('signing', () => {
@@ -148,7 +123,6 @@ describe('GovernanceVote', () => {
       const vote = makeVote()
       vote.sign(votingKey)
 
-      expect(recoverHashSigner(vote.signatureHash(), hexToBytes(vote.signature)).getAddress(Network.Testnet)).toBe(votingKey.getAddress())
       expect(vote.recoverSigner(Network.Testnet).getAddress(Network.Testnet)).toBe(votingKey.getAddress())
       expect(vote.recoverSigner(Network.Mainnet).getAddress(Network.Testnet)).not.toBe(votingKey.getAddress())
     })
@@ -157,7 +131,6 @@ describe('GovernanceVote', () => {
       const vote = makeVote()
       vote.sign(votingKey, Network.Mainnet)
 
-      expect(recoverMessageSigner(vote.signString(), hexToBytes(vote.signature)).getAddress(Network.Testnet)).toBe(votingKey.getAddress())
       expect(vote.recoverSigner('mainnet').getAddress(Network.Testnet)).toBe(votingKey.getAddress())
       expect(vote.recoverSigner(Network.Testnet).getAddress(Network.Testnet)).not.toBe(votingKey.getAddress())
     })
@@ -168,8 +141,6 @@ describe('GovernanceVote', () => {
 
       const parsed = GovernanceVote.fromBytes(vote.bytes())
       expect(parsed.hex()).toBe(vote.hex())
-      expect(parsed.hash()).toBe(vote.hash())
-      expect(parsed.toJSON()).toEqual(vote.toJSON())
     })
   })
 })

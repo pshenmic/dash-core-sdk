@@ -292,3 +292,17 @@ export function concatBytes (...chunks: Uint8Array[]): Uint8Array {
 export function encodeVarBytes (bytes: Uint8Array): Uint8Array {
   return concatBytes(encodeCompactSize(bytes.byteLength), bytes)
 }
+
+export function int32Bytes (value: number): Uint8Array {
+  const bytes = new Uint8Array(4)
+  new DataView(bytes.buffer).setInt32(0, value, true)
+
+  return bytes
+}
+
+export function int64Bytes (value: number | bigint): Uint8Array {
+  const bytes = new Uint8Array(8)
+  new DataView(bytes.buffer).setBigInt64(0, BigInt(value), true)
+
+  return bytes
+}

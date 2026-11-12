@@ -6,7 +6,9 @@ import {
   doubleSHA256,
   encodeVarBytes,
   getCompactVariableSize,
-  hexToBytes
+  hexToBytes,
+  int32Bytes,
+  int64Bytes
 } from '../../utils.js'
 import { GovernanceObjectJSON, GovernanceProposal } from '../../types.js'
 import { GovernanceObjectType } from '../../constants.js'
@@ -93,22 +95,13 @@ export class GovernanceObject {
   }
 
   bytes (): Uint8Array {
-    const revisionBytes = new Uint8Array(4)
-    new DataView(revisionBytes.buffer).setInt32(0, this.revision, true)
-
-    const timeBytes = new Uint8Array(8)
-    new DataView(timeBytes.buffer).setBigInt64(0, BigInt(this.time), true)
-
-    const typeBytes = new Uint8Array(4)
-    new DataView(typeBytes.buffer).setInt32(0, this.type, true)
-
     return concatBytes(
       hash32Bytes(this.parentHash),
-      revisionBytes,
-      timeBytes,
+      int32Bytes(this.revision),
+      int64Bytes(this.time),
       hash32Bytes(this.collateralHash),
       encodeVarBytes(hexToBytes(this.data)),
-      typeBytes,
+      int32Bytes(this.type),
       this.masternodeOutpoint.bytes(),
       encodeVarBytes(hexToBytes(this.signature))
     )
@@ -125,16 +118,10 @@ export class GovernanceObject {
    * the outpoint padded to a CTxIn and the signature; type and collateral hash are excluded
    */
   hash (): string {
-    const revisionBytes = new Uint8Array(4)
-    new DataView(revisionBytes.buffer).setInt32(0, this.revision, true)
-
-    const timeBytes = new Uint8Array(8)
-    new DataView(timeBytes.buffer).setBigInt64(0, BigInt(this.time), true)
-
     const hashBytes = doubleSHA256(concatBytes(
       hash32Bytes(this.parentHash),
-      revisionBytes,
-      timeBytes,
+      int32Bytes(this.revision),
+      int64Bytes(this.time),
       // Core hashes HexStr(vchData), lowercase
       encodeVarBytes(new TextEncoder().encode(bytesToHex(hexToBytes(this.data)))),
       outPointAsTxIn(this.masternodeOutpoint),

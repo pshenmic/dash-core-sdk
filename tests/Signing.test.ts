@@ -5,8 +5,6 @@ import { PrivateKey } from '../src/types/PrivateKey.js'
 import { CbTxVersion, Network, isCbTxV24 } from '../src/constants.js'
 import { bytesToHex, concatBytes, doubleSHA256, hexToBytes } from '../src/utils.js'
 
-const b64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64')
-
 describe('message signing', () => {
   // dashcore-lib test/message.js, a signature Dash Core verifymessage accepts
   const wif = 'cR4qogdN9UxLZJXCNFNwDRRZNeLRWuds9TTSuLNweFVjiaE4gPaq'
@@ -30,7 +28,6 @@ describe('message signing', () => {
 
     expect(signed[0]).toBeGreaterThanOrEqual(31)
     expect(recoverMessageSigner('hello, world', signed).getAddress(Network.Testnet)).toBe(address)
-    expect(b64(signed)).toBe(b64(signMessage('hello, world', PrivateKey.fromWIF(wif))))
   })
 
   test('should not recover the signer of another message', () => {

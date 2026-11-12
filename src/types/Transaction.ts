@@ -17,6 +17,7 @@ import { Output } from './Output.js'
 import {
   addressToPublicKeyHash,
   bytesToHex,
+  concatBytes,
   decodeCompactSize,
   doubleSHA256,
   encodeCompactSize,
@@ -160,9 +161,9 @@ export class Transaction {
     const lockTimeView = new DataView(new ArrayBuffer(4))
     lockTimeView.setUint32(0, this.#nLockTime, true)
 
-    const inputsHashBytes = doubleSHA256(this.#concatChunks(this.inputs.map(input => new OutPoint(input.txId, input.vOut).bytes())))
+    const inputsHashBytes = doubleSHA256(this.#prevoutsBytes())
     const sequencesBytes = this.#sequencesBytes()
-    const outputsHashBytes = doubleSHA256(this.#concatChunks(this.outputs.map(output => output.bytes())))
+    const outputsHashBytes = doubleSHA256(concatBytes(...this.outputs.map(output => output.bytes())))
 
     const typeBytes = new Uint8Array(2)
     const modeBytes = new Uint8Array(2)
@@ -185,7 +186,7 @@ export class Transaction {
     const operatorRewardBytes = new Uint8Array(2)
     new DataView(operatorRewardBytes.buffer, operatorRewardBytes.byteOffset, operatorRewardBytes.byteLength).setUint16(0, payload.operatorReward, true)
 
-    const sharesBytes = this.#concatChunks([new Uint8Array([shares.length]), ...shares.map(share => share.bytes())])
+    const sharesBytes = concatBytes(new Uint8Array([shares.length]), ...shares.map(share => share.bytes()))
 
     const earlyBytes = new Uint8Array(12)
     const earlyView = new DataView(earlyBytes.buffer)
@@ -258,9 +259,9 @@ export class Transaction {
     const lockTimeView = new DataView(new ArrayBuffer(4))
     lockTimeView.setUint32(0, this.#nLockTime, true)
 
-    const prevoutsBytes = this.#concatChunks(this.inputs.map(input => new OutPoint(input.txId, input.vOut).bytes()))
+    const prevoutsBytes = this.#prevoutsBytes()
     const sequencesBytes = this.#sequencesBytes()
-    const outputsBytes = this.#concatChunks(this.outputs.map(output => output.bytes()))
+    const outputsBytes = concatBytes(...this.outputs.map(output => output.bytes()))
 
     const proTxHashBytes = new Uint8Array(32)
     proTxHashBytes.set(hexToBytes(payload.proTxHash).toReversed())
@@ -307,7 +308,7 @@ export class Transaction {
    * Set into the payload's inputsHash when it has one; call after the inputs are final and before signing the payload
    */
   providerInputsHash (): string {
-    const inputsHash = bytesToHex(doubleSHA256(this.#concatChunks(this.inputs.map(input => new OutPoint(input.txId, input.vOut).bytes()))).toReversed())
+    const inputsHash = bytesToHex(doubleSHA256(this.#prevoutsBytes()).toReversed())
 
     if (this.extraPayload !== undefined && 'inputsHash' in this.extraPayload) {
       this.extraPayload.inputsHash = inputsHash
@@ -361,16 +362,9 @@ export class Transaction {
     return sequencesBytes
   }
 
-  #concatChunks (chunks: Uint8Array[]): Uint8Array {
-    const out = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0))
-
-    let off = 0
-    for (const chunk of chunks) {
-      out.set(chunk, off)
-      off += chunk.byteLength
-    }
-
-    return out
+  // outpoint of every input, in input order
+  #prevoutsBytes (): Uint8Array {
+    return concatBytes(...this.inputs.map(input => new OutPoint(input.txId, input.vOut).bytes()))
   }
 
   /**
