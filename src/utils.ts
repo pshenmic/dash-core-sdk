@@ -1,7 +1,6 @@
 import { DEFAULT_NETWORK, Network, PubKeyHashAddressNetworkPrefix, TransactionType } from './constants.js'
 import { ripemd160 } from '@noble/hashes/legacy.js'
 import { sha256 } from '@noble/hashes/sha2.js'
-import { concatBytes } from '@noble/hashes/utils.js'
 import { Base58Check } from './base58check.js'
 import { NetworkLike } from './types.js'
 import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
@@ -273,25 +272,4 @@ export function createAssetLockProof (data: InstantAssetLockProofData | ChainAss
   } else {
     throw new Error('Invalid lock params')
   }
-}
-
-/**
- * Varint length followed by the bytes, as Core serializes a std::vector<unsigned char> or std::string
- */
-export function encodeVarBytes (bytes: Uint8Array): Uint8Array {
-  return concatBytes(encodeCompactSize(bytes.byteLength), bytes)
-}
-
-export function int32Bytes (value: number): Uint8Array {
-  const bytes = new Uint8Array(4)
-  new DataView(bytes.buffer).setInt32(0, value, true)
-
-  return bytes
-}
-
-export function int64Bytes (value: number | bigint): Uint8Array {
-  const bytes = new Uint8Array(8)
-  new DataView(bytes.buffer).setBigInt64(0, BigInt(value), true)
-
-  return bytes
 }

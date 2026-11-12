@@ -4,11 +4,9 @@ import {
   bytesToHex,
   decodeCompactSize,
   doubleSHA256,
-  encodeVarBytes,
+  encodeCompactSize,
   getCompactVariableSize,
   hexToBytes,
-  int32Bytes,
-  int64Bytes,
   networkValueToEnumValue
 } from '../../utils.js'
 import { GovernanceVoteJSON, NetworkLike } from '../../types.js'
@@ -67,17 +65,22 @@ export class GovernanceVote {
   }
 
   #fields (): Uint8Array {
-    return concatBytes(
-      this.masternodeOutpoint.bytes(),
-      hash32Bytes(this.parentHash),
-      int32Bytes(this.outcome),
-      int32Bytes(this.signal),
-      int64Bytes(this.time)
-    )
+    const fields = new Uint8Array(84)
+    const view = new DataView(fields.buffer)
+
+    fields.set(this.masternodeOutpoint.bytes(), 0)
+    fields.set(hash32Bytes(this.parentHash), 36)
+    view.setInt32(68, this.outcome, true)
+    view.setInt32(72, this.signal, true)
+    view.setBigInt64(76, BigInt(this.time), true)
+
+    return fields
   }
 
   bytes (): Uint8Array {
-    return concatBytes(this.#fields(), encodeVarBytes(hexToBytes(this.signature)))
+    const signatureBytes = hexToBytes(this.signature)
+
+    return concatBytes(this.#fields(), encodeCompactSize(signatureBytes.byteLength), signatureBytes)
   }
 
   hex (): string {
@@ -91,13 +94,16 @@ export class GovernanceVote {
    * and the signature is excluded
    */
   hash (): string {
-    const hashBytes = doubleSHA256(concatBytes(
-      outPointAsTxIn(this.masternodeOutpoint),
-      hash32Bytes(this.parentHash),
-      int32Bytes(this.signal),
-      int32Bytes(this.outcome),
-      int64Bytes(this.time)
-    ))
+    const hashed = new Uint8Array(89)
+    const view = new DataView(hashed.buffer)
+
+    hashed.set(outPointAsTxIn(this.masternodeOutpoint), 0)
+    hashed.set(hash32Bytes(this.parentHash), 41)
+    view.setInt32(73, this.signal, true)
+    view.setInt32(77, this.outcome, true)
+    view.setBigInt64(81, BigInt(this.time), true)
+
+    const hashBytes = doubleSHA256(hashed)
 
     return bytesToHex(hashBytes.toReversed())
   }

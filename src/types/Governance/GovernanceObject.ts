@@ -4,11 +4,9 @@ import {
   bytesToHex,
   decodeCompactSize,
   doubleSHA256,
-  encodeVarBytes,
+  encodeCompactSize,
   getCompactVariableSize,
-  hexToBytes,
-  int32Bytes,
-  int64Bytes
+  hexToBytes
 } from '../../utils.js'
 import { GovernanceObjectJSON, GovernanceProposal } from '../../types.js'
 import { GovernanceObjectType } from '../../constants.js'
@@ -94,16 +92,34 @@ export class GovernanceObject {
     return GovernanceObject.fromBytes(hexToBytes(hex))
   }
 
+  // parent hash, revision and time, the prefix the serialization and the hash share
+  #header (): Uint8Array {
+    const header = new Uint8Array(44)
+    const view = new DataView(header.buffer)
+
+    header.set(hash32Bytes(this.parentHash), 0)
+    view.setInt32(32, this.revision, true)
+    view.setBigInt64(36, BigInt(this.time), true)
+
+    return header
+  }
+
   bytes (): Uint8Array {
+    const dataBytes = hexToBytes(this.data)
+    const signatureBytes = hexToBytes(this.signature)
+
+    const typeBytes = new Uint8Array(4)
+    new DataView(typeBytes.buffer).setInt32(0, this.type, true)
+
     return concatBytes(
-      hash32Bytes(this.parentHash),
-      int32Bytes(this.revision),
-      int64Bytes(this.time),
+      this.#header(),
       hash32Bytes(this.collateralHash),
-      encodeVarBytes(hexToBytes(this.data)),
-      int32Bytes(this.type),
+      encodeCompactSize(dataBytes.byteLength),
+      dataBytes,
+      typeBytes,
       this.masternodeOutpoint.bytes(),
-      encodeVarBytes(hexToBytes(this.signature))
+      encodeCompactSize(signatureBytes.byteLength),
+      signatureBytes
     )
   }
 
@@ -118,14 +134,17 @@ export class GovernanceObject {
    * the outpoint padded to a CTxIn and the signature; type and collateral hash are excluded
    */
   hash (): string {
+    // Core hashes HexStr(vchData), lowercase
+    const dataHexBytes = new TextEncoder().encode(bytesToHex(hexToBytes(this.data)))
+    const signatureBytes = hexToBytes(this.signature)
+
     const hashBytes = doubleSHA256(concatBytes(
-      hash32Bytes(this.parentHash),
-      int32Bytes(this.revision),
-      int64Bytes(this.time),
-      // Core hashes HexStr(vchData), lowercase
-      encodeVarBytes(new TextEncoder().encode(bytesToHex(hexToBytes(this.data)))),
+      this.#header(),
+      encodeCompactSize(dataHexBytes.byteLength),
+      dataHexBytes,
       outPointAsTxIn(this.masternodeOutpoint),
-      encodeVarBytes(hexToBytes(this.signature))
+      encodeCompactSize(signatureBytes.byteLength),
+      signatureBytes
     ))
 
     return bytesToHex(hashBytes.toReversed())

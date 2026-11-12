@@ -6,7 +6,7 @@ import {
   COMPACT_SIGNATURE_SIZE,
   MESSAGE_MAGIC
 } from './constants.js'
-import { doubleSHA256, encodeVarBytes } from './utils.js'
+import { doubleSHA256, encodeCompactSize } from './utils.js'
 import { PrivateKey } from './types/PrivateKey.js'
 import { PublicKey } from './types/PublicKey.js'
 
@@ -18,7 +18,7 @@ export function messageHash (message: string | Uint8Array): Uint8Array {
   const magicBytes = new TextEncoder().encode(MESSAGE_MAGIC)
   const messageBytes = typeof message === 'string' ? new TextEncoder().encode(message) : message
 
-  return doubleSHA256(concatBytes(encodeVarBytes(magicBytes), encodeVarBytes(messageBytes)))
+  return doubleSHA256(concatBytes(encodeCompactSize(magicBytes.byteLength), magicBytes, encodeCompactSize(messageBytes.byteLength), messageBytes))
 }
 
 /**
