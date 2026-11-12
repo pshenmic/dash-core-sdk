@@ -299,3 +299,39 @@ export interface MnHfSignalJSON {
   quorumHash: string
   sig: string
 }
+
+export interface GovernanceObjectJSON {
+  parentHash: string
+  revision: number
+  time: number
+  collateralHash: string
+  data: string
+  type: number
+  masternodeOutpoint: OutPointJSON
+  signature: string
+  hash: string
+}
+
+export interface GovernanceVoteJSON {
+  masternodeOutpoint: OutPointJSON
+  parentHash: string
+  outcome: number
+  signal: number
+  time: number
+  signature: string
+  hash: string
+}
+
+/**
+ * Data of a proposal governance object, the JSON fields as Dash Core reads them
+ */
+export interface GovernanceProposal {
+  type?: number
+  name: string
+  start_epoch: number
+  end_epoch: number
+  payment_address: string
+  payment_amount: number
+  url?: string
+  [key: string]: unknown
+}

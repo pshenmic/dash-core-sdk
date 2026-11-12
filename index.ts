@@ -16,7 +16,20 @@ import { PrivateKey } from './src/types/PrivateKey.js'
 import { PublicKey } from './src/types/PublicKey.js'
 import { Script } from './src/types/Script.js'
 import { Transaction } from './src/types/Transaction.js'
-import { Network, TransactionType } from './src/constants.js'
+import { GovernanceObject } from './src/types/Governance/GovernanceObject.js'
+import { GovernanceVote } from './src/types/Governance/GovernanceVote.js'
+import {
+  CbTxVersion,
+  GovernanceObjectType,
+  isCbTxV24,
+  MasternodeKeyRole,
+  Network,
+  TransactionType,
+  VoteOutcome,
+  VoteSignal
+} from './src/constants.js'
+import { messageHash, recoverHashSigner, recoverMessageSigner, signHash, signMessage } from './src/signing.js'
+import * as bls from './src/bls.js'
 import * as utils from './src/utils.js'
 
 export {
@@ -27,12 +40,20 @@ export {
   ExtraPayload,
   Messages,
   BloomFilterWriter,
+  bls,
+  CbTxVersion,
   CollateralShare,
   ExtNetInfo,
+  GovernanceObject,
+  GovernanceObjectType,
+  GovernanceVote,
   Input,
+  isCbTxV24,
   InstantLock,
   MerkleBlock,
+  MasternodeKeyRole,
   MerkleTree,
+  messageHash,
   Network,
   NetInfoEntryType,
   NetInfoPurpose,
@@ -41,12 +62,21 @@ export {
   PayoutShare,
   PrivateKey,
   PublicKey,
+  recoverHashSigner,
+  recoverMessageSigner,
   Script,
+  signHash,
+  signMessage,
   Transaction,
   TransactionJSON,
   TransactionType,
-  utils
+  utils,
+  VoteOutcome,
+  VoteSignal
 }
+
+export type { GovernanceObjectJSON, GovernanceProposal, GovernanceVoteJSON } from './src/types.js'
+export type { BlsExtendedKey, BlsKeyPair, BlsOperatorAccount } from './src/bls.js'
 
 export type {
   BloomFilter,

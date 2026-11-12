@@ -2,14 +2,17 @@ import { Script } from '../Script.js'
 import {
   bytesToHex,
   decodeCompactSize,
+  doubleSHA256,
   encodeCompactSize,
   getCompactVariableSize,
   hexToBytes,
   publicKeyHashToAddress
 } from '../../utils.js'
 import { NetworkLike, ProUpRegTxJSON } from '../../types.js'
-import { DEFAULT_NETWORK, PROTX_VERSION_EXT_ADDR } from '../../constants.js'
+import { COMPACT_SIGNATURE_SIZE, DEFAULT_NETWORK, PROTX_VERSION_EXT_ADDR } from '../../constants.js'
 import { PayoutShare } from '../PayoutShare.js'
+import { PrivateKey } from '../PrivateKey.js'
+import { signHash } from '../../signing.js'
 
 export class ProUpRegTx {
   version: number
@@ -102,6 +105,11 @@ export class ProUpRegTx {
   }
 
   bytes (): Uint8Array {
+    return this.#serialize(true)
+  }
+
+  // withSignature false is Core's SER_GETHASH form: no payloadSig and no length prefix
+  #serialize (withSignature: boolean): Uint8Array {
     const versionBytes = new Uint8Array(2)
     const modeBytes = new Uint8Array(2)
 
@@ -140,8 +148,8 @@ export class ProUpRegTx {
     const inputsHashBytes = new Uint8Array(32)
     inputsHashBytes.set(hexToBytes(this.inputsHash).toReversed())
 
-    const payloadSigBytes = hexToBytes(this.payloadSig)
-    const payloadSigSizeBytes = encodeCompactSize(payloadSigBytes.byteLength)
+    const payloadSigBytes = withSignature ? hexToBytes(this.payloadSig) : new Uint8Array(0)
+    const payloadSigSizeBytes = withSignature ? encodeCompactSize(payloadSigBytes.byteLength) : new Uint8Array(0)
 
     const outBytes = new Uint8Array(136 + scriptPayoutSizeBytes.byteLength + scriptPayoutBytes.byteLength + payloadSigSizeBytes.byteLength + payloadSigBytes.byteLength)
 
@@ -161,6 +169,29 @@ export class ProUpRegTx {
 
   hex (): string {
     return bytesToHex(this.bytes())
+  }
+
+  /**
+   * SHA256d of the payload without payloadSig, in internal byte order (Dash Core ::SerializeHash)
+   */
+  payloadHash (): Uint8Array {
+    return doubleSHA256(this.#serialize(false))
+  }
+
+  /**
+   * Sign with the owner key, a compact hash signature over payloadHash
+   *
+   * Set inputsHash (Transaction.providerInputsHash) and every other field first, the signature covers them
+   */
+  signWithOwnerKey (privateKey: PrivateKey): void {
+    this.payloadSig = bytesToHex(signHash(this.payloadHash(), privateKey))
+  }
+
+  /**
+   * Payload size once signed with a 65 byte compact signature
+   */
+  signedSize (): number {
+    return this.#serialize(false).byteLength + getCompactVariableSize(COMPACT_SIGNATURE_SIZE) + COMPACT_SIGNATURE_SIZE
   }
 
   toJSON (): ProUpRegTxJSON {
