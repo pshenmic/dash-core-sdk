@@ -3,7 +3,8 @@ import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { messageHash, recoverHashSigner, recoverMessageSigner, signHash, signMessage } from '../src/signing.js'
 import { PrivateKey } from '../src/types/PrivateKey.js'
 import { CbTxVersion, Network, isCbTxV24 } from '../src/constants.js'
-import { bytesToHex, concatBytes, doubleSHA256, hexToBytes } from '../src/utils.js'
+import { concatBytes } from '@noble/hashes/utils.js'
+import { bytesToHex, doubleSHA256, hexToBytes } from '../src/utils.js'
 
 describe('message signing', () => {
   // dashcore-lib test/message.js, a signature Dash Core verifymessage accepts

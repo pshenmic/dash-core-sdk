@@ -1,4 +1,5 @@
 import { bls12_381, bls12_381_Fr as Fr } from '@noble/curves/bls12-381.js'
+import { concatBytes } from '@noble/hashes/utils.js'
 import { bytesToNumberBE, numberToBytesBE } from '@noble/curves/utils.js'
 import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
@@ -13,7 +14,7 @@ import {
   MasternodeKeyRole
 } from './constants.js'
 import { NetworkLike } from './types.js'
-import { concatBytes, networkValueToEnumValue } from './utils.js'
+import { networkValueToEnumValue } from './utils.js'
 
 const G1 = bls12_381.G1.Point
 const HARDENED_OFFSET = 0x80000000

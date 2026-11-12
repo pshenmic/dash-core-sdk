@@ -1,11 +1,12 @@
 import { secp256k1 } from '@noble/curves/secp256k1.js'
+import { concatBytes } from '@noble/hashes/utils.js'
 import {
   COMPACT_SIGNATURE_COMPRESSED_FLAG,
   COMPACT_SIGNATURE_HEADER_BASE,
   COMPACT_SIGNATURE_SIZE,
   MESSAGE_MAGIC
 } from './constants.js'
-import { doubleSHA256, encodeVarBytes, concatBytes } from './utils.js'
+import { doubleSHA256, encodeVarBytes } from './utils.js'
 import { PrivateKey } from './types/PrivateKey.js'
 import { PublicKey } from './types/PublicKey.js'
 

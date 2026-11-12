@@ -1,7 +1,7 @@
 import { OutPoint } from '../OutPoint.js'
+import { concatBytes } from '@noble/hashes/utils.js'
 import {
   bytesToHex,
-  concatBytes,
   decodeCompactSize,
   doubleSHA256,
   encodeVarBytes,

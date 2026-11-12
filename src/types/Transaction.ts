@@ -1,3 +1,4 @@
+import { concatBytes } from '@noble/hashes/utils.js'
 import {
   ASSET_UNLOCK_PAYLOAD_SIZE,
   ASSET_UNLOCK_QUORUM_INFO_SIZE,
@@ -17,7 +18,6 @@ import { Output } from './Output.js'
 import {
   addressToPublicKeyHash,
   bytesToHex,
-  concatBytes,
   decodeCompactSize,
   doubleSHA256,
   encodeCompactSize,

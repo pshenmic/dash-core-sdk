@@ -1,6 +1,7 @@
 import { DEFAULT_NETWORK, Network, PubKeyHashAddressNetworkPrefix, TransactionType } from './constants.js'
 import { ripemd160 } from '@noble/hashes/legacy.js'
 import { sha256 } from '@noble/hashes/sha2.js'
+import { concatBytes } from '@noble/hashes/utils.js'
 import { Base58Check } from './base58check.js'
 import { NetworkLike } from './types.js'
 import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
@@ -272,18 +273,6 @@ export function createAssetLockProof (data: InstantAssetLockProofData | ChainAss
   } else {
     throw new Error('Invalid lock params')
   }
-}
-
-export function concatBytes (...chunks: Uint8Array[]): Uint8Array {
-  const out = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0))
-
-  let offset = 0
-  for (const chunk of chunks) {
-    out.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-
-  return out
 }
 
 /**
