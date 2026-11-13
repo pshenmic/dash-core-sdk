@@ -26,7 +26,6 @@ import * as secp from '@noble/secp256k1'
 import { PrivateKey } from './types/PrivateKey.js'
 import { Transaction } from './types/Transaction.js'
 import { InstantLock } from './types/InstantLock.js'
-import type { ServerStreamingCall } from '@protobuf-ts/runtime-rpc'
 import { AssetLockTx } from './types/ExtraPayload/AssetLockTx.js'
 import { AssetUnlockTx } from './types/ExtraPayload/AssetUnlockTx.js'
 import { CbTx } from './types/ExtraPayload/CbTx.js'
@@ -124,11 +123,12 @@ export class DashCoreSDK {
   grpcConnectionPool: GRPCConnectionPool
   network: 'mainnet' | 'testnet'
 
-  constructor (options: { network?: 'mainnet' | 'testnet', dapiUrl?: string, poolLimit?: number } = {}) {
+  constructor (options: { network?: 'mainnet' | 'testnet', dapiUrl?: string, poolLimit?: number, retries?: number } = {}) {
     this.network = options.network ?? 'testnet'
     this.grpcConnectionPool = new GRPCConnectionPool(this.network, {
       dapiUrl: options.dapiUrl,
-      poolLimit: options.poolLimit ?? 5
+      poolLimit: options.poolLimit,
+      retries: options.retries
     })
   }
 
@@ -192,19 +192,19 @@ export class DashCoreSDK {
   }
 
   async getTransaction (txid: string): Promise<DapiTransaction> {
-    const client = this.grpcConnectionPool.getClient()
+    const client = await this.grpcConnectionPool.getClient()
 
     return (await client.getTransaction(GetTransactionRequest.fromJson({ id: txid }))).response
   }
 
   async getBlockchainStatus (): Promise<GetBlockchainStatusResponse> {
-    const client = this.grpcConnectionPool.getClient()
+    const client = await this.grpcConnectionPool.getClient()
 
     return (await client.getBlockchainStatus(GetBlockchainStatusRequest.fromJson({}))).response
   }
 
   async getMasternodeStatus (): Promise<GetMasternodeStatusResponse> {
-    const client = this.grpcConnectionPool.getClient()
+    const client = await this.grpcConnectionPool.getClient()
 
     return (await client.getMasternodeStatus(GetMasternodeStatusRequest.fromJson({}))).response
   }
@@ -214,7 +214,7 @@ export class DashCoreSDK {
       throw new Error('Hash or height cannot be undefined or null')
     }
 
-    const client = this.grpcConnectionPool.getClient()
+    const client = await this.grpcConnectionPool.getClient()
 
     const req: BlockRequest = {}
 
@@ -228,13 +228,13 @@ export class DashCoreSDK {
   }
 
   async getBestBlockHeight (): Promise<GetBestBlockHeightResponse> {
-    const client = this.grpcConnectionPool.getClient()
+    const client = await this.grpcConnectionPool.getClient()
 
     return (await client.getBestBlockHeight(GetBestBlockHeightRequest.fromJson({}))).response
   }
 
   async broadcastTransaction (transaction: Uint8Array, allowHighFees?: boolean, bypassLimits?: boolean): Promise<BroadcastTransactionResponse> {
-    const client = this.grpcConnectionPool.getClient()
+    const client = await this.grpcConnectionPool.getClient()
 
     return (await client.broadcastTransaction(BroadcastTransactionRequest.create({
       transaction,
@@ -244,7 +244,7 @@ export class DashCoreSDK {
   }
 
   async getEstimatedTransactionFee (blocks: number): Promise<number> {
-    const client = this.grpcConnectionPool.getClient()
+    const client = await this.grpcConnectionPool.getClient()
 
     const { response } = (await client.getEstimatedTransactionFee(GetEstimatedTransactionFeeRequest.fromJson({ blocks })))
 
@@ -369,14 +369,14 @@ export class DashCoreSDK {
     const abortController = new AbortController()
     const reconnectReason = 'DAPI_RECONNECT_STREAM'
 
-    const iterator = this.subscribeToTransactionsWithProofs({ ...bf.toObject() }, count, sendTransactionHashes, undefined, fromBlockHeight, abortController)
+    const responses = await this.subscribeToTransactionsWithProofs({ ...bf.toObject() }, count, sendTransactionHashes, undefined, fromBlockHeight, abortController)
 
     const reconnectTimeout = setTimeout(() => {
       abortController.abort(reconnectReason)
     }, DAPI_STREAM_RECONNECT_TIMEOUT)
 
     try {
-      for await (const event of iterator.responses) {
+      for await (const event of responses) {
         const { responses } = event
 
         switch (responses.oneofKind) {
@@ -422,8 +422,8 @@ export class DashCoreSDK {
     }
   }
 
-  subscribeToTransactionsWithProofs (bloomFilter: BloomFilter, count: number, sendTransactionHashes: boolean, fromBlockHash?: Uint8Array, fromBlockHeight?: number, abortController?: AbortController): ServerStreamingCall<TransactionsWithProofsRequest, TransactionsWithProofsResponse> {
-    const client = this.grpcConnectionPool.getClient(abortController)
+  async subscribeToTransactionsWithProofs (bloomFilter: BloomFilter, count: number, sendTransactionHashes: boolean, fromBlockHash?: Uint8Array, fromBlockHeight?: number, abortController?: AbortController): Promise<AsyncIterable<TransactionsWithProofsResponse>> {
+    const client = await this.grpcConnectionPool.getClient(abortController)
 
     if ((fromBlockHash == null && fromBlockHeight == null) || (fromBlockHash != null && fromBlockHeight != null)) {
       throw new Error('Either fromBlockHash or fromBlockHeight must be set')
@@ -457,14 +457,14 @@ export class DashCoreSDK {
       sendTransactionHashes
     })
 
-    return client.subscribeToTransactionsWithProofs(request)
+    return client.subscribeToTransactionsWithProofs(request).responses
   }
 
-  subscribeToMasternodeList (): ServerStreamingCall<MasternodeListRequest, MasternodeListResponse> {
-    const client = this.grpcConnectionPool.getClient()
+  async subscribeToMasternodeList (): Promise<AsyncIterable<MasternodeListResponse>> {
+    const client = await this.grpcConnectionPool.getClient()
 
     const request = MasternodeListRequest.create({})
 
-    return client.subscribeToMasternodeList(request)
+    return client.subscribeToMasternodeList(request).responses
   }
 }

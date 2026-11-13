@@ -10,14 +10,6 @@ export const DASH_VERSIONS = {
  */
 export const GRPC_DEFAULT_POOL_LIMIT = 5
 
-/**
- * Minimal delay between two background refreshes of the DAPI node pool.
- *
- * getClient runs on every SDK call, so a degraded pool would otherwise fire an
- * evonode lookup per call while the previous one is still cooling down.
- */
-export const POOL_REFRESH_COOLDOWN = 30000
-
 export const FEE_PER_BYTE = 1
 export const MIN_FEE_RELAY = 1000
 

@@ -75,7 +75,7 @@ async function main () {
   console.log('--- subscribeToTransactionsWithProofs (short run) ---')
   const bf = { vData: [], nHashFuncs: 0, nTweak: 0, nFlags: 0 }
 
-  const stream = sdk.subscribeToTransactionsWithProofs(
+  const stream = await sdk.subscribeToTransactionsWithProofs(
     bf,
     0,
     false,
@@ -83,7 +83,7 @@ async function main () {
     best.height
   )
 
-  const iterator = stream.responses[Symbol.asyncIterator]()
+  const iterator = stream[Symbol.asyncIterator]()
   const timeout = Date.now() + STREAM_RUNTIME_MS
 
   while (Date.now() < timeout) {
@@ -93,8 +93,8 @@ async function main () {
   }
 
   console.log('--- subscribeToMasternodeList (short run) ---')
-  const mnStream = sdk.subscribeToMasternodeList()
-  const mnIter = mnStream.responses[Symbol.asyncIterator]()
+  const mnStream = await sdk.subscribeToMasternodeList()
+  const mnIter = mnStream[Symbol.asyncIterator]()
   const mnTimeout = Date.now() + STREAM_RUNTIME_MS
 
   while (Date.now() < mnTimeout) {
