@@ -116,10 +116,12 @@ const withTimeout = async <T>(request: (abortController: AbortController) => Pro
 
 const isNodeHealthy = async (url: string, signal?: AbortSignal): Promise<boolean> => {
   try {
-    const { response } = await withTimeout(async abortController => {
+    const response = await withTimeout(async abortController => {
       signal?.addEventListener('abort', () => abortController.abort())
 
-      return await createCoreClient(url, abortController).getBlockchainStatus(GetBlockchainStatusRequest.create({}))
+      const { response } = await createCoreClient(url, abortController).getBlockchainStatus(GetBlockchainStatusRequest.create({}))
+
+      return response
     })
 
     return response.status === GetBlockchainStatusResponse_Status.READY
