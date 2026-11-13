@@ -76,9 +76,11 @@ function toEvonodeUrls (masternodeListDiff: Uint8Array): string[] {
  *
  * @param url - DAPI node to query
  */
-async function queryNode (url: string): Promise<string[]> {
+async function queryNode (url: string, externalAbortController?: AbortController): Promise<string[]> {
   const abortController = new AbortController()
   const timer = setTimeout(() => abortController.abort(), REQUEST_TIMEOUT)
+
+  externalAbortController?.signal.addEventListener('abort', () => abortController.abort())
 
   try {
     const client = createCoreClient(url, abortController)
@@ -109,8 +111,9 @@ async function queryNode (url: string): Promise<string[]> {
  *
  * @param dapiUrls - nodes to query, tried in rotation
  * @param attempts - maximum number of attempts (optional, defaults to 5)
+ * @param abortController - optional controller cancelling the query, e.g. when it loses a discovery race
  */
-export default async function getEvonodeList (dapiUrls: string[], attempts = 5): Promise<string[]> {
+export default async function getEvonodeList (dapiUrls: string[], attempts = 5, abortController?: AbortController): Promise<string[]> {
   if (dapiUrls.length === 0) {
     throw new Error('No DAPI nodes available to query the masternode list')
   }
@@ -119,7 +122,7 @@ export default async function getEvonodeList (dapiUrls: string[], attempts = 5):
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      return await queryNode(dapiUrls[attempt % dapiUrls.length])
+      return await queryNode(dapiUrls[attempt % dapiUrls.length], abortController)
     } catch (e) {
       lastError = e
 
