@@ -123,12 +123,13 @@ export class DashCoreSDK {
   grpcConnectionPool: GRPCConnectionPool
   network: 'mainnet' | 'testnet'
 
-  constructor (options: { network?: 'mainnet' | 'testnet', dapiUrl?: string, poolLimit?: number, retries?: number } = {}) {
+  constructor (options: { network?: 'mainnet' | 'testnet', dapiUrl?: string, poolLimit?: number, retries?: number, requestTimeout?: number } = {}) {
     this.network = options.network ?? 'testnet'
     this.grpcConnectionPool = new GRPCConnectionPool(this.network, {
       dapiUrl: options.dapiUrl,
       poolLimit: options.poolLimit,
-      retries: options.retries
+      retries: options.retries,
+      requestTimeout: options.requestTimeout
     })
   }
 
@@ -460,8 +461,8 @@ export class DashCoreSDK {
     return client.subscribeToTransactionsWithProofs(request).responses
   }
 
-  async subscribeToMasternodeList (): Promise<AsyncIterable<MasternodeListResponse>> {
-    const client = await this.grpcConnectionPool.getClient()
+  async subscribeToMasternodeList (abortController?: AbortController): Promise<AsyncIterable<MasternodeListResponse>> {
+    const client = await this.grpcConnectionPool.getClient(abortController)
 
     const request = MasternodeListRequest.create({})
 
