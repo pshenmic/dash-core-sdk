@@ -1,7 +1,7 @@
 import getEvonodeList from './getEvonodeList.js'
 import createCoreClient from './createCoreClient.js'
 import { CoreClient } from '../proto/generated/core.client.js'
-import { GetBlockchainStatusRequest, GetBlockchainStatusResponse_Status } from '../proto/generated/core.js'
+import { GetBlockchainStatusRequest } from '../proto/generated/core.js'
 import { fetchWithDetails } from './fetchWithDetails.js'
 import { wait } from './utils.js'
 import { GRPC_DEFAULT_POOL_LIMIT } from './constants.js'
@@ -10,11 +10,17 @@ const GRPC_DEFAULT_CONNECT_RETRIES = 5
 // first ban lasts 60 seconds, every next ban without a successful request in between lasts e times longer
 const NODE_BASE_BAN_PERIOD_MS = 60 * 1000
 const RETRY_DELAY_MS = 10
+const GRPC_DEFAULT_REQUEST_TIMEOUT_MS = 10 * 1000
 
 export interface GRPCOptions {
   poolLimit?: number
   dapiUrl?: string | string[]
   retries?: number
+  /**
+   * Deadline of a single request attempt in milliseconds, the request is aborted and retried on another node when it expires.
+   * Streams are not limited by it. Default is 10 seconds
+   */
+  requestTimeout?: number
 }
 
 export interface MasternodeInfo {
@@ -124,7 +130,7 @@ const isNodeHealthy = async (url: string, signal?: AbortSignal): Promise<boolean
       return response
     })
 
-    return response.status === GetBlockchainStatusResponse_Status.READY
+    return response.syncProgress >= 0.9999
   } catch (e) {
     return false
   }
@@ -149,6 +155,7 @@ export default class GRPCConnectionPool {
   #poolLimit: number
   #dapiUrl?: string | string[]
   readonly retries: number
+  readonly requestTimeout: number
   #nodeIndex = 0
   #initialization?: Promise<void>
   // ban state of nodes that failed with a retryable error, banned nodes are skipped on node selection
@@ -163,10 +170,17 @@ export default class GRPCConnectionPool {
       throw new Error(`GRPC retries must be a non-negative integer, got ${String(retries)}`)
     }
 
+    const requestTimeout = grpcOptions?.requestTimeout ?? GRPC_DEFAULT_REQUEST_TIMEOUT_MS
+
+    if (!Number.isInteger(requestTimeout) || requestTimeout <= 0) {
+      throw new Error(`GRPC requestTimeout must be a positive integer, got ${String(requestTimeout)}`)
+    }
+
     this.network = network
     this.#poolLimit = grpcOptions?.poolLimit ?? GRPC_DEFAULT_POOL_LIMIT
     this.#dapiUrl = grpcOptions?.dapiUrl
     this.retries = retries
+    this.requestTimeout = requestTimeout
 
     // start initialization in the background, failures are reported on the first request
     this.#initialization = this.#initializePool()
@@ -389,38 +403,70 @@ export default class GRPCConnectionPool {
     return async (input, init) => {
       // transport always requests `${dapiUrl}/${service}/${method}`
       const methodPath = String(input).slice(dapiUrl.length)
+      // streams are long-lived and must not get a deadline, they are aborted only by the caller's signal
+      const hasDeadline = !methodPath.includes('subscribe')
+      const outerSignal = init?.signal
       const triedUrls = [dapiUrl]
       let nodeUrl = dapiUrl
 
       for (let retry = 0; ; retry++) {
+        const abortController = hasDeadline ? new AbortController() : undefined
+        const onOuterAbort = (): void => abortController?.abort()
+        const timeout = hasDeadline ? setTimeout(() => abortController?.abort(), this.requestTimeout) : undefined
+
+        if (abortController != null) {
+          outerSignal?.addEventListener('abort', onOuterAbort)
+
+          if (outerSignal?.aborted === true) {
+            abortController.abort()
+          }
+        }
+
         try {
-          return await fetchWithDetails(`${nodeUrl}${methodPath}`, init)
+          const response = await fetchWithDetails(`${nodeUrl}${methodPath}`, abortController != null ? { ...init, signal: abortController.signal } : init)
+
+          // a successful request resets the ban escalation of the node
+          this.#bans.delete(nodeUrl)
+
+          return response
         } catch (e) {
+          // the deadline abort is retryable, the caller's abort is not
+          const timedOut = abortController?.signal.aborted === true && outerSignal?.aborted !== true
+          // surface the expired deadline as a timeout error instead of a bare abort
+          const error = timedOut
+            ? Object.assign(new Error(`Request timed out after ${this.requestTimeout}ms`, { cause: e }), { name: 'TimeoutError' })
+            : e
           // the transaction could already be received by the node,
           // so broadcast is retried only if the connection was not established
-          const isRetryable = methodPath.includes('broadcast') ? isConnectError(e) : !isAbortError(e)
+          const isRetryable = methodPath.includes('broadcast') ? isConnectError(e) : (!isAbortError(e) || timedOut)
 
-          if (!isRetryable || init?.signal?.aborted === true) {
-            throw e
+          if (!isRetryable || outerSignal?.aborted === true) {
+            throw error
           }
 
           this.#ban(nodeUrl)
 
           if (retry >= this.retries) {
-            throw e
+            throw error
           }
 
           await wait(RETRY_DELAY_MS)
 
-          const nextUrl = init?.signal?.aborted !== true ? this.#nextNode(triedUrls) : undefined
+          const nextUrl = outerSignal?.aborted !== true ? this.#nextNode(triedUrls) : undefined
 
           if (nextUrl == null) {
-            throw e
+            throw error
           }
 
           triedUrls.push(nextUrl)
           nodeUrl = nextUrl
           onNodeChange(nextUrl)
+        } finally {
+          clearTimeout(timeout)
+
+          if (abortController != null) {
+            outerSignal?.removeEventListener('abort', onOuterAbort)
+          }
         }
       }
     }

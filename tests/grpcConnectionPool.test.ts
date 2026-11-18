@@ -1,11 +1,11 @@
 import { jest } from '@jest/globals'
-import { GetBlockchainStatusResponse_Status } from '../proto/generated/core.js'
 
 interface MockClient {
   url: string
   abortController?: AbortController
   fetch: typeof globalThis.fetch
-  getBlockchainStatus: () => Promise<{ response: { status: number } }>
+  getBlockchainStatus: () => Promise<{ response: { syncProgress: number } }>
+  subscribeToMasternodeList: () => { responses: AsyncIterable<unknown> }
 }
 
 const getEvonodeList = jest.fn<(dapiUrls: string[], attempts?: number, abortController?: AbortController) => Promise<string[]>>()
@@ -21,9 +21,6 @@ jest.unstable_mockModule('../src/createCoreClient.js', () => ({
 
 const { default: GRPCConnectionPool } = await import('../src/grpcConnectionPool.js')
 const { DashCoreSDK } = await import('../src/DashCoreSDK.js')
-
-const READY = GetBlockchainStatusResponse_Status.READY
-const SYNCING = GetBlockchainStatusResponse_Status.SYNCING
 
 const TESTNET_SEEDS = [
   'https://153.80.206.232:1443',
@@ -54,7 +51,7 @@ const NODE_C = 'https://10.0.0.3:1443'
 const METHOD_PATH = '/org.dash.platform.dapi.v0.Core/getBlockchainStatus'
 const BROADCAST_PATH = '/org.dash.platform.dapi.v0.Core/broadcastTransaction'
 
-// 'ready' by default, 'syncing' answers a non-READY status, 'down' throws
+// 'ready' by default, 'syncing' answers an incomplete sync progress, 'down' throws
 const nodeHealth = new Map<string, 'ready' | 'syncing' | 'down'>()
 
 const connectError = (code = 'ECONNREFUSED'): TypeError =>
@@ -103,13 +100,15 @@ describe('GRPCConnectionPool', () => {
           throw new Error(`${url} is down`)
         }
 
-        return { response: { status: health === 'ready' ? READY : SYNCING } }
-      }
+        return { response: { syncProgress: health === 'ready' ? 1 : 0.5 } }
+      },
+      subscribeToMasternodeList: () => ({ responses: (async function * () {})() })
     }))
   })
 
   afterEach(() => {
     jest.restoreAllMocks()
+    jest.useRealTimers()
   })
 
   describe('initialization', () => {
@@ -171,7 +170,7 @@ describe('GRPCConnectionPool', () => {
           }
 
           if (url === SEED_A || url === SEED_B) {
-            return { response: { status: READY } }
+            return { response: { syncProgress: 1 } }
           }
 
           return await new Promise((_resolve, reject) => {
@@ -414,7 +413,8 @@ describe('GRPCConnectionPool', () => {
 
       expect(response).toEqual({ ok: true })
       expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([`${NODE_A}${METHOD_PATH}`, `${NODE_B}${METHOD_PATH}`])
-      expect(fetchSpy.mock.calls[1][1]).toBe(init)
+      expect(fetchSpy.mock.calls[1][1]).toMatchObject({ method: 'POST' })
+      expect(fetchSpy.mock.calls[1][1]?.signal).toBeInstanceOf(AbortSignal)
 
       // the failed node is banned
       expect((await pool.getClient() as unknown as MockClient).url).toBe(NODE_B)
@@ -518,6 +518,173 @@ describe('GRPCConnectionPool', () => {
     })
   })
 
+  describe('request deadline', () => {
+    it('should abort a silent node after requestTimeout and retry on the next node', async () => {
+      const pool = new GRPCConnectionPool('testnet', { dapiUrl: [NODE_A, NODE_B], requestTimeout: 30 })
+      const client = await pool.getClient() as unknown as MockClient
+
+      fetchSpy.mockImplementation(async (url, init) => {
+        if (String(url).startsWith(NODE_A)) {
+          return await new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(abortError()))
+          })
+        }
+
+        return OK_RESPONSE
+      })
+
+      const response = await client.fetch(`${NODE_A}${METHOD_PATH}`)
+
+      expect(response).toEqual({ ok: true })
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+      // the abandoned request is aborted, freeing the connection
+      expect(fetchSpy.mock.calls[0][1]?.signal?.aborted).toBe(true)
+      // the silent node is banned
+      expect((await pool.getClient() as unknown as MockClient).url).toBe(NODE_B)
+    }, 2000)
+
+    it('should abort a silent node after the default 10s deadline', async () => {
+      jest.useFakeTimers()
+
+      try {
+        const pool = new GRPCConnectionPool('testnet', { dapiUrl: [NODE_A, NODE_B] })
+        const client = await pool.getClient() as unknown as MockClient
+
+        fetchSpy.mockImplementation(async (url, init) => {
+          if (String(url).startsWith(NODE_A)) {
+            return await new Promise<Response>((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () => reject(abortError()))
+            })
+          }
+
+          return OK_RESPONSE
+        })
+
+        const request = client.fetch(`${NODE_A}${METHOD_PATH}`)
+
+        await jest.advanceTimersByTimeAsync(10_000)
+        await jest.advanceTimersByTimeAsync(10)
+
+        await expect(request).resolves.toEqual({ ok: true })
+      } finally {
+        jest.useRealTimers()
+      }
+    }, 2000)
+
+    it('should abort the underlying fetch when the caller aborts, without retrying or banning', async () => {
+      const pool = new GRPCConnectionPool('testnet', { dapiUrl: [NODE_A, NODE_B], requestTimeout: 5000 })
+      const client = await pool.getClient() as unknown as MockClient
+      const abortController = new AbortController()
+
+      fetchSpy.mockImplementation(async (_url, init) => await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(abortError()))
+      }))
+
+      const request = client.fetch(`${NODE_A}${METHOD_PATH}`, { signal: abortController.signal })
+      abortController.abort()
+
+      await expect(request).rejects.toThrow('The operation was aborted')
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      // the caller's signal is wrapped, but its abort still reaches the fetch
+      expect(fetchSpy.mock.calls[0][1]?.signal).not.toBe(abortController.signal)
+      expect(fetchSpy.mock.calls[0][1]?.signal?.aborted).toBe(true)
+      // NODE_A is not banned
+      expect((await pool.getClient() as unknown as MockClient).url).toBe(NODE_B)
+      expect((await pool.getClient() as unknown as MockClient).url).toBe(NODE_A)
+    }, 2000)
+
+    it('should not apply the deadline to streams', async () => {
+      const pool = new GRPCConnectionPool('testnet', { dapiUrl: NODE_A, requestTimeout: 30 })
+      const client = await pool.getClient() as unknown as MockClient
+      const streamPath = '/org.dash.platform.dapi.v0.Core/subscribeToMasternodeList'
+
+      let resolveStream: (response: Response) => void = () => {}
+      fetchSpy.mockImplementation(async () => await new Promise<Response>(resolve => {
+        resolveStream = resolve
+      }))
+
+      const request = client.fetch(`${NODE_A}${streamPath}`)
+
+      await new Promise(resolve => setTimeout(resolve, 80))
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(fetchSpy.mock.calls[0][1]?.signal?.aborted ?? false).toBe(false)
+
+      resolveStream(OK_RESPONSE)
+      await expect(request).resolves.toEqual({ ok: true })
+    }, 2000)
+
+    it('should not retry a broadcast that hit the deadline', async () => {
+      const pool = new GRPCConnectionPool('testnet', { dapiUrl: [NODE_A, NODE_B], requestTimeout: 30 })
+      const client = await pool.getClient() as unknown as MockClient
+
+      fetchSpy.mockImplementation(async (_url, init) => await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(abortError()))
+      }))
+
+      await expect(client.fetch(`${NODE_A}${BROADCAST_PATH}`)).rejects.toMatchObject({ name: 'TimeoutError', message: 'Request timed out after 30ms' })
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    }, 2000)
+
+    it('should reject with a timeout error when the deadline exhausts the retries', async () => {
+      const pool = new GRPCConnectionPool('testnet', { dapiUrl: [NODE_A, NODE_B], retries: 1, requestTimeout: 30 })
+      const client = await pool.getClient() as unknown as MockClient
+
+      fetchSpy.mockImplementation(async (_url, init) => await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(abortError()))
+      }))
+
+      await expect(client.fetch(`${NODE_A}${METHOD_PATH}`)).rejects.toMatchObject({ name: 'TimeoutError', message: 'Request timed out after 30ms' })
+    }, 2000)
+
+    it('should reject with a timeout error when no other node is available', async () => {
+      const pool = new GRPCConnectionPool('testnet', { dapiUrl: NODE_A, requestTimeout: 30 })
+      const client = await pool.getClient() as unknown as MockClient
+
+      fetchSpy.mockImplementation(async (_url, init) => await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(abortError()))
+      }))
+
+      await expect(client.fetch(`${NODE_A}${METHOD_PATH}`)).rejects.toMatchObject({ name: 'TimeoutError', message: 'Request timed out after 30ms' })
+    }, 2000)
+
+    it('should reset the ban escalation after a successful request', async () => {
+      const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000)
+      const pool = new GRPCConnectionPool('testnet', { dapiUrl: [NODE_A, NODE_B] })
+
+      pool.banNode(await pool.getClient())
+
+      now.mockReturnValue(1_000_000 + 61_000)
+      await pool.getClient()
+      const recovered = await pool.getClient()
+
+      fetchSpy.mockResolvedValueOnce(OK_RESPONSE)
+      await (recovered as unknown as MockClient).fetch(`${NODE_A}${METHOD_PATH}`)
+
+      pool.banNode(recovered)
+
+      // the ban after a successful request lasts 60s again, not 60s * e
+      now.mockReturnValue(1_000_000 + 61_000 + 61_000)
+
+      const urls = [
+        (await pool.getClient() as unknown as MockClient).url,
+        (await pool.getClient() as unknown as MockClient).url
+      ]
+
+      expect(urls).toContain(NODE_A)
+    })
+
+    it.each([0, -1, 1.5])('should reject requestTimeout = %s', (requestTimeout) => {
+      expect(() => new GRPCConnectionPool('testnet', { requestTimeout })).toThrow('GRPC requestTimeout must be a positive integer')
+    })
+
+    it('should default requestTimeout to 10 seconds', () => {
+      const pool = new GRPCConnectionPool('testnet', { dapiUrl: NODE_A })
+
+      expect(pool.requestTimeout).toBe(10_000)
+    })
+  })
+
   describe('DashCoreSDK', () => {
     it('should resolve waitForInit once the seeds are healthchecked', async () => {
       const sdk = new DashCoreSDK({ network: 'testnet' })
@@ -534,6 +701,21 @@ describe('GRPCConnectionPool', () => {
       const sdk = new DashCoreSDK({ network: 'testnet' })
 
       await expect(sdk.waitForInit()).rejects.toThrow('None of the testnet seed nodes are available')
+    })
+
+    it('should pass requestTimeout to the pool', () => {
+      const sdk = new DashCoreSDK({ network: 'testnet', requestTimeout: 1234 })
+
+      expect(sdk.grpcConnectionPool.requestTimeout).toBe(1234)
+    })
+
+    it('should pass the abort controller to subscribeToMasternodeList', async () => {
+      const sdk = new DashCoreSDK({ network: 'testnet', dapiUrl: NODE_A })
+      const abortController = new AbortController()
+
+      await sdk.subscribeToMasternodeList(abortController)
+
+      expect(createCoreClient).toHaveBeenLastCalledWith(NODE_A, abortController, expect.any(Function))
     })
   })
 })
