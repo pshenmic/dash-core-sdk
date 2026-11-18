@@ -47,42 +47,30 @@ const seedNodes = {
     // seed-1.pshenmic.dev
     'https://153.80.206.232:1443',
     // DCG seed
-    'https://34.209.12.72:1443',
-    // Testnet validators (hp-masternode-1 -> hp-masternode-15)
-    'https://68.67.122.1:1443',
-    'https://68.67.122.2:1443',
-    'https://68.67.122.3:1443',
-    'https://68.67.122.4:1443',
-    'https://68.67.122.5:1443',
-    'https://68.67.122.6:1443',
-    'https://68.67.122.7:1443',
-    'https://68.67.122.8:1443',
-    'https://68.67.122.9:1443',
-    'https://68.67.122.10:1443',
-    'https://68.67.122.11:1443',
-    'https://68.67.122.12:1443',
-    'https://68.67.122.13:1443',
-    'https://68.67.122.14:1443',
-    'https://68.67.122.15:1443'
+    'https://seed-1.testnet.networks.dash.org:1443',
+    // Testnet validator
+    'https://68.67.122.1:1443'
   ],
   mainnet: [
     // seed-1.pshenmic.dev
     'https://153.80.206.97:443',
     // DCG seed
-    'https://34.211.174.194:443',
+    'https://seed-1.mainnet.networks.dash.org:443',
     // validator
     'https://95.216.146.18:443'
   ]
 }
 
-const HEALTHCHECK_TIMEOUT_MS = 3000
+// Seeds bootstrap the pool without blocking init. Evonode discovery runs after the first
+// successful request, so it never competes with the first queries.
+const SEED_DISCOVERY_TIMEOUT_MS = 4000
+const SEED_DISCOVERY_DELAY_MS = 2500
 
-// Per-client concurrency × clients initializing at once is the instantaneous load on nodes,
-// so healthchecks run a small window at a time to avoid a fleet-wide request burst.
-const HEALTHCHECK_CONCURRENCY = 2
-// Init resolves at this many healthy nodes; seeds only bootstrap the pool and are replaced
-// by discovered evonodes, so they never stay in the long-lived pool.
-const HEALTHCHECK_MIN_HEALTHY_NODES = 2
+const VALIDATOR_CHECK_TIMEOUT_MS = 3000
+// The pool keeps serving requests with the seeds until this many evonodes are healthy.
+const VALIDATOR_CHECK_MIN_HEALTHY = 2
+// Evonodes are healthchecked a small window at a time to avoid a request burst.
+const VALIDATOR_CHECK_CONCURRENCY = 2
 
 const isAbortError = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError'
 
@@ -109,26 +97,36 @@ const isConnectError = (error: unknown): boolean => {
 /**
  * Runs a request with an AbortController that is aborted after the given timeout
  */
-const withTimeout = async <T>(request: (abortController: AbortController) => Promise<T>, timeoutMs = HEALTHCHECK_TIMEOUT_MS): Promise<T> => {
+const withTimeout = async <T>(request: (abortController: AbortController) => Promise<T>, timeoutMs = VALIDATOR_CHECK_TIMEOUT_MS): Promise<T> => {
   const abortController = new AbortController()
-  const timeout = setTimeout(() => abortController.abort(), timeoutMs)
+  let timeout: ReturnType<typeof setTimeout> | undefined
 
   try {
-    return await request(abortController)
+    // Race with a rejection as well: aborting a fetch is not guaranteed to settle the
+    // promise, e.g. while the TLS handshake is stuck, so the timeout must reject explicitly.
+    return await Promise.race([
+      request(abortController),
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          abortController.abort()
+          reject(new Error(`Request timed out after ${timeoutMs}ms`))
+        }, timeoutMs)
+      })
+    ])
   } finally {
-    clearTimeout(timeout)
+    if (timeout != null) {
+      clearTimeout(timeout)
+    }
   }
 }
 
-const isNodeHealthy = async (url: string, signal?: AbortSignal): Promise<boolean> => {
+const isNodeHealthy = async (url: string): Promise<boolean> => {
   try {
     const response = await withTimeout(async abortController => {
-      signal?.addEventListener('abort', () => abortController.abort())
-
       const { response } = await createCoreClient(url, abortController).getBlockchainStatus(GetBlockchainStatusRequest.create({}))
 
       return response
-    })
+    }, VALIDATOR_CHECK_TIMEOUT_MS)
 
     return response.syncProgress >= 0.9999
   } catch (e) {
@@ -158,6 +156,9 @@ export default class GRPCConnectionPool {
   readonly requestTimeout: number
   #nodeIndex = 0
   #initialization?: Promise<void>
+  #discoveryScheduled = false
+  // Known seeds that are not in the active pool yet, used only when the active nodes fail
+  #fallbackUrls: string[] = []
   // ban state of nodes that failed with a retryable error, banned nodes are skipped on node selection
   #bans = new Map<string, { bannedTimes: number, bannedUntil: number }>()
   // node that served (or is serving) the request of the client
@@ -205,92 +206,108 @@ export default class GRPCConnectionPool {
       return
     }
 
-    // Race all seeds for discovery; the first successful response wins and the losers are
-    // aborted. If every seed fails, init rejects with "no peers" (the original contract).
-    const evonodeListPromise = async (): Promise<string[]> => {
-      const winner = new AbortController()
-
-      try {
-        return await Promise.any(seedNodes[network].map(async seed =>
-          await withTimeout(async abortController => {
-            winner.signal.addEventListener('abort', () => abortController.abort())
-
-            return await getEvonodeList([seed], 1, abortController)
-          })))
-      } catch (e) {
-        const errors = (e as AggregateError).errors
-        throw new AggregateError(errors, `None of the ${network} seed nodes are available: ${errors.map(String).join('; ')}`)
-      } finally {
-        winner.abort()
-      }
-    }
-
-    // Bootstrap the pool by racing all seed healthchecks; resolve at the first K healthy
-    // and abort the rest, so a slow/dead seed never stalls initialization.
-    const seeds = seedNodes[network]
-    const healthySeeds: string[] = []
-
-    const bootstrapPromise = new Promise<void>((resolve, reject) => {
-      const race = new AbortController()
-      let pending = seeds.length
-
-      seeds.forEach(seed => {
-        void isNodeHealthy(seed, race.signal).then(healthy => {
-          if (healthy) {
-            healthySeeds.push(seed)
-
-            if (healthySeeds.length >= HEALTHCHECK_MIN_HEALTHY_NODES) {
-              race.abort()
-              resolve()
-            }
-          }
-
-          pending -= 1
-          if (pending === 0) {
-            if (healthySeeds.length === 0) {
-              reject(new Error(`None of the ${network} seed nodes are available (nodes must be synced)`))
-            } else {
-              resolve()
-            }
-          }
-        })
-      })
-    })
-
-    // Discovery failure fails initialization with "no peers", exactly as before.
-    const [, evonodeUrls] = await Promise.all([bootstrapPromise, evonodeListPromise()])
-
-    this.dapiUrls = [...healthySeeds]
-
-    // Replace the bootstrap seeds with discovered evonodes in the background.
-    void (async () => {
-      const evonodes = shuffle([...new Set(evonodeUrls)])
-      const healthyEvonodes: string[] = []
-      let evonodeIndex = 0
-
-      const checkEvonode = async (): Promise<void> => {
-        while (evonodeIndex < evonodes.length && healthyEvonodes.length < this.#poolLimit) {
-          const url = evonodes[evonodeIndex++]
-
-          if (await isNodeHealthy(url)) {
-            healthyEvonodes.push(url)
-
-            // Evict the bootstrap seeds once enough evonodes are healthy.
-            if (healthyEvonodes.length >= HEALTHCHECK_MIN_HEALTHY_NODES) {
-              this.dapiUrls = healthyEvonodes.slice(0, this.#poolLimit)
-            }
-          }
-        }
-      }
-
-      await Promise.all(Array.from({ length: HEALTHCHECK_CONCURRENCY }, async () => await checkEvonode()))
-    })().catch(() => {
-      // keep the bootstrap seeds if evonode healthchecks fail
-    })
+    // The first request is the healthcheck: start from the primary seed, keep the rest as
+    // fallbacks for retries, and promote healthy ones in the background.
+    const seeds = [seedNodes[network][0], ...shuffle(seedNodes[network].slice(1))]
+    this.dapiUrls = [seeds[0]]
+    this.#fallbackUrls = seeds.slice(1)
+    this.#probeFallbacks()
   }
 
   /**
-   * Waits for the pool initialization, a failed attempt is retried on the next call
+   * Healthchecks the fallback seeds in the background and promotes the healthy ones.
+   * An unhealthy seed stays in the fallback list, so a request retry can still try it.
+   */
+  #probeFallbacks (): void {
+    for (const url of [...this.#fallbackUrls]) {
+      void isNodeHealthy(url).then(healthy => {
+        if (healthy) {
+          this.#promoteFallback(url)
+        }
+      })
+    }
+  }
+
+  #promoteFallback (url: string): void {
+    if (!this.#fallbackUrls.includes(url)) {
+      return
+    }
+
+    this.#fallbackUrls = this.#fallbackUrls.filter(fallback => fallback !== url)
+    this.dapiUrls.push(url)
+  }
+
+  /**
+   * Starts evonode discovery once, after the first request had a chance to complete.
+   * It is a background job: the pool keeps serving requests from the seeds meanwhile.
+   */
+  #scheduleDiscovery (): void {
+    if (this.#discoveryScheduled || this.#dapiUrl != null) {
+      return
+    }
+
+    this.#discoveryScheduled = true
+
+    setTimeout(() => {
+      void this.#discoverEvonodes().catch(() => {
+        // keep using the seeds if discovery fails
+      })
+    }, SEED_DISCOVERY_DELAY_MS)
+  }
+
+  /**
+   * Fetches the current evonode list, healthchecks its nodes and replaces the seeds with
+   * the healthy evonodes. The checks run here, off the critical path, so the first requests
+   * are never delayed by them and the long-lived pool does not fill up with lagging nodes.
+   */
+  async #discoverEvonodes (): Promise<void> {
+    const evonodeUrls = await this.#fetchEvonodeList()
+
+    if (evonodeUrls.length === 0) {
+      return
+    }
+
+    const healthyEvonodes: string[] = []
+    let evonodeIndex = 0
+
+    const checkEvonode = async (): Promise<void> => {
+      while (evonodeIndex < evonodeUrls.length && healthyEvonodes.length < this.#poolLimit) {
+        const url = evonodeUrls[evonodeIndex++]
+
+        if (await isNodeHealthy(url)) {
+          healthyEvonodes.push(url)
+
+          // Replace the seeds once enough evonodes are healthy, so a single slow node
+          // cannot hold the whole pool. Otherwise the seeds stay as a fallback.
+          if (healthyEvonodes.length >= VALIDATOR_CHECK_MIN_HEALTHY) {
+            this.dapiUrls = healthyEvonodes.slice(0, this.#poolLimit)
+          }
+        }
+      }
+    }
+
+    await Promise.all(Array.from({ length: VALIDATOR_CHECK_CONCURRENCY }, async () => await checkEvonode()))
+  }
+
+  /**
+   * Reads the evonode list from the first responding seed.
+   */
+  async #fetchEvonodeList (): Promise<string[]> {
+    // One controller cancels the losing streams as soon as one seed answers
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), SEED_DISCOVERY_TIMEOUT_MS)
+
+    try {
+      return await Promise.any(shuffle([...seedNodes[this.network]]).map(async seed => await getEvonodeList([seed], 1, controller)))
+    } finally {
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }
+
+  /**
+   * Waits for the seed bootstrap. Evonode discovery continues in the background after it resolves.
+   * A failed attempt is retried on the next call.
    */
   async ready (): Promise<void> {
     // retry initialization if the previous attempt failed
@@ -359,7 +376,7 @@ export default class GRPCConnectionPool {
 
   #ban (url: string): void {
     // a single node is never banned, otherwise the pool would have no nodes to send requests to
-    if (this.dapiUrls.length <= 1) {
+    if (this.dapiUrls.length + this.#fallbackUrls.length <= 1) {
       return
     }
 
@@ -389,6 +406,15 @@ export default class GRPCConnectionPool {
       if (!exclude.includes(url) && !this.#isBanned(url)) {
         return url
       }
+    }
+
+    // Every active node is banned or already tried: promote a fallback seed into the pool.
+    // This keeps the first batch on the primary node while preserving failover.
+    const fallback = this.#fallbackUrls.find(url => !exclude.includes(url) && !this.#isBanned(url))
+
+    if (fallback != null) {
+      this.#promoteFallback(fallback)
+      return fallback
     }
 
     return undefined
@@ -427,6 +453,10 @@ export default class GRPCConnectionPool {
 
           // a successful request resets the ban escalation of the node
           this.#bans.delete(nodeUrl)
+
+          // The first served request doubles as the seed healthcheck; start the
+          // background evonode discovery only after it succeeded.
+          this.#scheduleDiscovery()
 
           return response
         } catch (e) {

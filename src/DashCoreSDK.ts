@@ -134,7 +134,8 @@ export class DashCoreSDK {
   }
 
   /**
-   * Resolves when the connection pool initialization (seed nodes check and evonodes discovery) is finished
+   * Resolves when the pool has healthy seed nodes to serve requests from. Evonode discovery keeps
+   * running in the background after it resolves and expands the pool without blocking requests.
    */
   async waitForInit (): Promise<void> {
     await this.grpcConnectionPool.ready()
