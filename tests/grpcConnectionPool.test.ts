@@ -24,25 +24,11 @@ const { DashCoreSDK } = await import('../src/DashCoreSDK.js')
 
 const TESTNET_SEEDS = [
   'https://153.80.206.232:1443',
-  'https://34.209.12.72:1443',
-  'https://68.67.122.1:1443',
-  'https://68.67.122.2:1443',
-  'https://68.67.122.3:1443',
-  'https://68.67.122.4:1443',
-  'https://68.67.122.5:1443',
-  'https://68.67.122.6:1443',
-  'https://68.67.122.7:1443',
-  'https://68.67.122.8:1443',
-  'https://68.67.122.9:1443',
-  'https://68.67.122.10:1443',
-  'https://68.67.122.11:1443',
-  'https://68.67.122.12:1443',
-  'https://68.67.122.13:1443',
-  'https://68.67.122.14:1443',
-  'https://68.67.122.15:1443'
+  'https://seed-1.testnet.networks.dash.org:1443',
+  'https://68.67.122.1:1443'
 ]
 
-const [SEED_A, SEED_B] = TESTNET_SEEDS
+const [SEED_A] = TESTNET_SEEDS
 
 const NODE_A = 'https://10.0.0.1:1443'
 const NODE_B = 'https://10.0.0.2:1443'
@@ -74,6 +60,25 @@ const waitFor = async (condition: () => boolean): Promise<void> => {
 }
 
 const checkedUrls = (): string[] => createCoreClient.mock.calls.map(([url]) => url)
+
+// Makes every seed healthcheck wait until the returned release function is called
+const gateHealthChecks = (): (() => void) => {
+  let release: () => void = () => {}
+  const gate = new Promise<void>(resolve => { release = resolve })
+
+  createCoreClient.mockImplementation((url, abortController, fetch) => ({
+    url,
+    abortController,
+    fetch: fetch ?? globalThis.fetch,
+    getBlockchainStatus: async () => {
+      await gate
+      return { response: { syncProgress: 1 } }
+    },
+    subscribeToMasternodeList: () => ({ responses: (async function * () {})() })
+  }))
+
+  return release
+}
 
 describe('GRPCConnectionPool', () => {
   let fetchSpy: jest.SpiedFunction<typeof globalThis.fetch>
@@ -154,60 +159,66 @@ describe('GRPCConnectionPool', () => {
       expect(() => new GRPCConnectionPool('testnet', { retries })).toThrow('GRPC retries must be a non-negative integer')
     })
 
-    it('should put the only healthy seed first and fall back to the full seed list', async () => {
+    it('should resolve immediately with the primary seed, before healthchecks finish', async () => {
+      const release = gateHealthChecks()
+      const pool = new GRPCConnectionPool('testnet')
+
+      await pool.ready()
+
+      expect(pool.dapiUrls).toEqual([SEED_A])
+
+      release()
+      await new Promise(resolve => setImmediate(resolve))
+    })
+
+    it('should append healthy seeds in the background', async () => {
+      const pool = new GRPCConnectionPool('testnet')
+      await pool.ready()
+
+      await waitFor(() => pool.dapiUrls.length >= 2)
+
+      expect(pool.dapiUrls[0]).toBe(SEED_A)
+      expect(pool.dapiUrls.length).toBeLessThanOrEqual(TESTNET_SEEDS.length)
+    })
+
+    it('should promote a fallback seed when the active node is banned', async () => {
+      const release = gateHealthChecks()
+      const pool = new GRPCConnectionPool('testnet')
+      const client = await pool.getClient()
+
+      expect(pool.dapiUrls).toEqual([SEED_A])
+
+      pool.banNode(client)
+
+      const next = await pool.getClient() as unknown as MockClient
+
+      expect(next.url).not.toBe(SEED_A)
+      expect(pool.dapiUrls).toContain(next.url)
+
+      release()
+      await new Promise(resolve => setImmediate(resolve))
+    })
+
+    it('should resolve even when no seed is healthy', async () => {
       for (const seed of TESTNET_SEEDS) {
         nodeHealth.set(seed, 'down')
       }
-      nodeHealth.set(SEED_A, 'ready')
 
       const pool = new GRPCConnectionPool('testnet')
       await pool.ready()
 
-      // a single node has no failover, so the rest of the seeds stay behind it
-      expect(pool.dapiUrls).toEqual(TESTNET_SEEDS)
-    })
-
-    it('should resolve bootstrap at the first healthy seeds and abort the rest', async () => {
-      const controllers = new Map<string, AbortController>()
-
-      // the first two seeds answer immediately, the rest hang until they are aborted
-      createCoreClient.mockImplementation((url, abortController, fetch) => ({
-        url,
-        abortController,
-        fetch: fetch ?? globalThis.fetch,
-        getBlockchainStatus: async () => {
-          if (abortController != null) {
-            controllers.set(url, abortController)
-          }
-
-          if (url === SEED_A || url === SEED_B) {
-            return { response: { syncProgress: 1 } }
-          }
-
-          return await new Promise((_resolve, reject) => {
-            abortController?.signal.addEventListener('abort', () => reject(abortError()))
-          })
-        }
-      }))
-
-      const pool = new GRPCConnectionPool('testnet')
-      await pool.ready()
-
-      expect(pool.dapiUrls).toEqual([SEED_A, SEED_B])
-
-      for (const [url, controller] of controllers) {
-        if (url !== SEED_A && url !== SEED_B) {
-          expect(controller.signal.aborted).toBe(true)
-        }
-      }
+      expect(pool.dapiUrls).toEqual([SEED_A])
     })
 
     it('should not query the masternode list during bootstrap', async () => {
+      const release = gateHealthChecks()
       const pool = new GRPCConnectionPool('testnet')
       await pool.ready()
 
       expect(getEvonodeList).not.toHaveBeenCalled()
-      expect(pool.dapiUrls).toHaveLength(2)
+
+      release()
+      await new Promise(resolve => setImmediate(resolve))
     })
 
     it('should discover evonodes in waves after the first successful request', async () => {
@@ -216,8 +227,8 @@ describe('GRPCConnectionPool', () => {
 
       await discover(pool)
 
-      // one wave of four seeds, not all seventeen
-      expect(getEvonodeList).toHaveBeenCalledTimes(4)
+      // one wave over the seed list, not one request per seed at startup
+      expect(getEvonodeList).toHaveBeenCalledTimes(TESTNET_SEEDS.length)
 
       for (const [, attempts, abortController] of getEvonodeList.mock.calls) {
         expect(attempts).toBe(1)
@@ -225,33 +236,13 @@ describe('GRPCConnectionPool', () => {
       }
     })
 
-    it('should not wait for all seeds before resolving', async () => {
-      for (const seed of TESTNET_SEEDS.slice(2)) {
-        nodeHealth.set(seed, 'down')
-      }
-
-      const pool = new GRPCConnectionPool('testnet')
-      await pool.ready()
-
-      expect(pool.dapiUrls).toEqual([SEED_A, SEED_B])
-    })
-
-    it('should fall back to the full seed list when no seed is healthy', async () => {
-      for (const seed of TESTNET_SEEDS) {
-        nodeHealth.set(seed, 'down')
-      }
-
-      const pool = new GRPCConnectionPool('testnet')
-      await pool.ready()
-
-      expect(pool.dapiUrls).toEqual(TESTNET_SEEDS)
-    })
-
-    it('should keep the bootstrap seeds when discovery fails', async () => {
+    it('should keep the pool when discovery fails', async () => {
       getEvonodeList.mockRejectedValue(new Error('discovery failed'))
 
       const pool = new GRPCConnectionPool('testnet')
       await pool.ready()
+      await waitFor(() => pool.dapiUrls.length >= 2)
+
       const bootstrap = [...pool.dapiUrls]
 
       await discover(pool)
@@ -259,17 +250,15 @@ describe('GRPCConnectionPool', () => {
       expect(pool.dapiUrls).toEqual(bootstrap)
     })
 
-    it('should replace the bootstrap seeds with discovered evonodes', async () => {
+    it('should replace the seeded pool with discovered evonodes', async () => {
       getEvonodeList.mockResolvedValue([NODE_A, NODE_B, NODE_C])
 
       const pool = new GRPCConnectionPool('testnet')
       await pool.ready()
-      const bootstrap = [...pool.dapiUrls]
 
       await discover(pool)
-      await waitFor(() => pool.dapiUrls.length === 3)
+      await waitFor(() => pool.dapiUrls.length === 3 && pool.dapiUrls[0] === NODE_A)
 
-      expect(bootstrap).toHaveLength(2)
       expect(pool.dapiUrls).toEqual([NODE_A, NODE_B, NODE_C])
     })
 
@@ -293,6 +282,8 @@ describe('GRPCConnectionPool', () => {
 
       const pool = new GRPCConnectionPool('testnet')
       await pool.ready()
+      await waitFor(() => pool.dapiUrls.length >= 2)
+
       const bootstrap = [...pool.dapiUrls]
 
       await discover(pool)
@@ -307,6 +298,8 @@ describe('GRPCConnectionPool', () => {
 
       const pool = new GRPCConnectionPool('testnet')
       await pool.ready()
+      await waitFor(() => pool.dapiUrls.length >= 2)
+
       const bootstrap = [...pool.dapiUrls]
 
       await discover(pool)
@@ -692,14 +685,19 @@ describe('GRPCConnectionPool', () => {
   })
 
   describe('DashCoreSDK', () => {
-    it('should resolve waitForInit once two healthy seeds are found', async () => {
+    it('should resolve waitForInit without waiting for healthchecks', async () => {
+      const release = gateHealthChecks()
       const sdk = new DashCoreSDK({ network: 'testnet' })
+
       await sdk.waitForInit()
 
-      expect(sdk.grpcConnectionPool.dapiUrls).toEqual([SEED_A, SEED_B])
+      expect(sdk.grpcConnectionPool.dapiUrls).toEqual([SEED_A])
+
+      release()
+      await new Promise(resolve => setImmediate(resolve))
     })
 
-    it('should fall back to the full seed list when no seed is available', async () => {
+    it('should resolve waitForInit even when no seed is available', async () => {
       for (const seed of TESTNET_SEEDS) {
         nodeHealth.set(seed, 'down')
       }
@@ -707,7 +705,7 @@ describe('GRPCConnectionPool', () => {
       const sdk = new DashCoreSDK({ network: 'testnet' })
 
       await expect(sdk.waitForInit()).resolves.toBeUndefined()
-      expect(sdk.grpcConnectionPool.dapiUrls).toEqual(TESTNET_SEEDS)
+      expect(sdk.grpcConnectionPool.dapiUrls).toEqual([SEED_A])
     })
 
     it('should pass requestTimeout to the pool', () => {
