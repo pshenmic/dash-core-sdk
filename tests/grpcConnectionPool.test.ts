@@ -221,13 +221,13 @@ describe('GRPCConnectionPool', () => {
       await new Promise(resolve => setImmediate(resolve))
     })
 
-    it('should discover evonodes in waves after the first successful request', async () => {
+    it('should discover evonodes after the first successful request', async () => {
       const pool = new GRPCConnectionPool('testnet')
       await pool.ready()
 
       await discover(pool)
 
-      // one wave over the seed list, not one request per seed at startup
+      // discovery starts only after a request, not during init
       expect(getEvonodeList).toHaveBeenCalledTimes(TESTNET_SEEDS.length)
 
       for (const [, attempts, abortController] of getEvonodeList.mock.calls) {
